@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0a0a1a">
+  <title>Ahorro Casa</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header>
+      <h1>🏠 Ahorro Casa</h1>
+      <button id="btn-settings" class="btn-icon" title="Configuración">⚙️</button>
+    </header>
+
+    <!-- Main dashboard -->
+    <main id="dashboard">
+      <!-- Progress ring -->
+      <section class="hero">
+        <div class="progress-ring-container">
+          <svg class="progress-ring" viewBox="0 0 200 200">
+            <circle class="progress-ring-bg" cx="100" cy="100" r="85" />
+            <circle class="progress-ring-fill" cx="100" cy="100" r="85" id="progress-ring" />
+          </svg>
+          <div class="progress-ring-text">
+            <span id="progress-pct" class="progress-pct">0%</span>
+            <span class="progress-label">completado</span>
+          </div>
+        </div>
+        <div class="hero-info">
+          <div class="hero-amount">
+            <span class="hero-currency">€</span>
+            <span id="saved-amount">0</span>
+          </div>
+          <div class="hero-target">
+            de <span id="target-amount">80.000</span> € necesarios
+          </div>
+        </div>
+      </section>
+
+      <!-- Countdown -->
+      <section class="countdown-card">
+        <div class="countdown-icon">⏳</div>
+        <div class="countdown-info">
+          <div class="countdown-title">Tiempo estimado</div>
+          <div class="countdown-value" id="countdown">— meses</div>
+          <div class="countdown-date" id="countdown-date">Fecha estimada: —</div>
+        </div>
+      </section>
+
+      <!-- Scenario toggle -->
+      <section class="scenario-toggle">
+        <button class="scenario-btn active" data-scenario="solo">👤 Solo Guti</button>
+        <button class="scenario-btn" data-scenario="both">👥 Con Carolina</button>
+      </section>
+
+      <!-- Stats cards -->
+      <section class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">💰</div>
+          <div class="stat-label">Ahorro mensual</div>
+          <div class="stat-value" id="stat-monthly">450 €</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">📈</div>
+          <div class="stat-label">Casa cuesta hoy</div>
+          <div class="stat-value" id="stat-house-now">400.000 €</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🏠</div>
+          <div class="stat-label">Casa costará</div>
+          <div class="stat-value" id="stat-house-then">— €</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🎯</div>
+          <div class="stat-label">Entrada necesaria</div>
+          <div class="stat-value" id="stat-entry">— €</div>
+        </div>
+      </section>
+
+      <!-- Savings breakdown -->
+      <section class="breakdown-card">
+        <h3>Tu patrimonio</h3>
+        <div class="breakdown-list">
+          <div class="breakdown-item">
+            <span class="breakdown-dot" style="background:#3498db"></span>
+            <span class="breakdown-label">S&P 500</span>
+            <span class="breakdown-value" id="bd-spy">— €</span>
+          </div>
+          <div class="breakdown-item">
+            <span class="breakdown-dot" style="background:#2ecc71"></span>
+            <span class="breakdown-label">MSCI World</span>
+            <span class="breakdown-value" id="bd-msci">— €</span>
+          </div>
+          <div class="breakdown-item">
+            <span class="breakdown-dot" style="background:#f39c12"></span>
+            <span class="breakdown-label">Oro</span>
+            <span class="breakdown-value" id="bd-gold">— €</span>
+          </div>
+          <div class="breakdown-item">
+            <span class="breakdown-dot" style="background:#9b59b6"></span>
+            <span class="breakdown-label">Efectivo TR</span>
+            <span class="breakdown-value" id="bd-cash">— €</span>
+          </div>
+          <div class="breakdown-item total">
+            <span class="breakdown-dot" style="background:transparent"></span>
+            <span class="breakdown-label">Total</span>
+            <span class="breakdown-value" id="bd-total">— €</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Loans -->
+      <section class="breakdown-card">
+        <h3>Préstamos</h3>
+        <div class="breakdown-list">
+          <div class="breakdown-item">
+            <span class="breakdown-dot" style="background:#e74c3c"></span>
+            <span class="breakdown-label">Préstamo *8602</span>
+            <span class="breakdown-value" id="bd-loan1">— €</span>
+          </div>
+          <div class="breakdown-item">
+            <span class="breakdown-dot" style="background:#e74c3c"></span>
+            <span class="breakdown-label">Préstamo *7491</span>
+            <span class="breakdown-value" id="bd-loan2">— €</span>
+          </div>
+          <div class="breakdown-item">
+            <span class="breakdown-dot" style="background:#e74c3c"></span>
+            <span class="breakdown-label">Cuota mensual</span>
+            <span class="breakdown-value" id="bd-loan-monthly">— €</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Monthly history -->
+      <section class="history-card">
+        <div class="history-header">
+          <h3>Historial mensual</h3>
+          <button id="btn-add-month" class="btn-small">+ Añadir</button>
+        </div>
+        <div id="history-list" class="history-list">
+          <p class="history-empty">Sin datos todavía. Pulsa "+ Añadir" para registrar este mes.</p>
+        </div>
+      </section>
+    </main>
+
+    <!-- Settings modal -->
+    <div id="modal-settings" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>⚙️ Configuración</h2>
+          <button class="btn-close" id="settings-close">✕</button>
+        </div>
+
+        <div class="form-section">
+          <h3>🏠 Vivienda</h3>
+          <div class="form-group">
+            <label>Precio actual de la casa (€)</label>
+            <input type="number" id="set-house-price" value="400000">
+          </div>
+          <div class="form-group">
+            <label>Entrada requerida (%)</label>
+            <input type="number" id="set-entry-pct" value="10">
+          </div>
+          <div class="form-group">
+            <label>Impuestos y gastos (%)</label>
+            <input type="number" id="set-taxes-pct" value="10">
+          </div>
+          <div class="form-group">
+            <label>Subida anual vivienda (%)</label>
+            <input type="number" id="set-house-increase" value="5" step="0.5">
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3>👤 Guti (solo)</h3>
+          <div class="form-group">
+            <label>Ahorro mensual (€)</label>
+            <input type="number" id="set-solo-monthly" value="450">
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3>👥 Con Carolina</h3>
+          <div class="form-group">
+            <label>Ahorro mensual (€)</label>
+            <input type="number" id="set-both-monthly" value="1500">
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3>💰 Patrimonio actual</h3>
+          <div class="form-group">
+            <label>S&P 500 (€)</label>
+            <input type="number" id="set-spy" value="316">
+          </div>
+          <div class="form-group">
+            <label>MSCI World (€)</label>
+            <input type="number" id="set-msci" value="58">
+          </div>
+          <div class="form-group">
+            <label>Oro (€)</label>
+            <input type="number" id="set-gold" value="51">
+          </div>
+          <div class="form-group">
+            <label>Efectivo TR (€)</label>
+            <input type="number" id="set-cash" value="1410">
+          </div>
+          <div class="form-group">
+            <label>S&P 500 mensual (€)</label>
+            <input type="number" id="set-spy-monthly" value="50">
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3>📉 Préstamos</h3>
+          <div class="form-group">
+            <label>Pendiente *8602 (€)</label>
+            <input type="number" id="set-loan1" value="5544">
+          </div>
+          <div class="form-group">
+            <label>Pendiente *7491 (€)</label>
+            <input type="number" id="set-loan2" value="15924">
+          </div>
+          <div class="form-group">
+            <label>Cuota mensual total (€)</label>
+            <input type="number" id="set-loan-monthly" value="279">
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button id="btn-save-settings" class="btn-primary">💾 Guardar</button>
+          <button id="btn-reset-settings" class="btn-secondary">🔄 Restaurar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add month modal -->
+    <div id="modal-add-month" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>📊 Registrar mes</h2>
+          <button class="btn-close" id="add-month-close">✕</button>
+        </div>
+        <div class="form-group">
+          <label>Fecha</label>
+          <input type="month" id="add-month-date">
+        </div>
+        <div class="form-group">
+          <label>Efectivo TR (€)</label>
+          <input type="number" id="add-month-cash" placeholder="1410">
+        </div>
+        <div class="form-group">
+          <label>S&P 500 (€)</label>
+          <input type="number" id="add-month-spy" placeholder="316">
+        </div>
+        <div class="form-group">
+          <label>MSCI World (€)</label>
+          <input type="number" id="add-month-msci" placeholder="58">
+        </div>
+        <div class="form-group">
+          <label>Oro (€)</label>
+          <input type="number" id="add-month-gold" placeholder="51">
+        </div>
+        <div class="form-actions">
+          <button id="btn-save-month" class="btn-primary">💾 Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
