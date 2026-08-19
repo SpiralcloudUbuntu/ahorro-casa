@@ -39,6 +39,29 @@ header {
 }
 header h1 { font-size: 20px; font-weight: 700; }
 
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.user-info { display: flex; align-items: center; }
+.user-name { font-size: 11px; color: var(--text-dim); max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.btn-icon-sm {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  color: var(--text);
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .btn-icon {
   background: var(--card);
   border: 1px solid var(--card-border);
@@ -222,6 +245,19 @@ header h1 { font-size: 20px; font-weight: 700; }
   flex: 1; padding: 12px; background: var(--accent); color: white;
   border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer;
 }
+
+/* Login styles */
+.login-desc { font-size: 14px; color: var(--text-dim); margin-bottom: 16px; }
+.btn-google {
+  width: 100%; padding: 12px; background: white; color: #333;
+  border: none; border-radius: 10px; font-size: 15px; font-weight: 500;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.divider { display: flex; align-items: center; gap: 12px; margin: 16px 0; color: var(--text-dim); font-size: 12px; }
+.divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.15); }
+.login-note { font-size: 12px; color: var(--text-dim); text-align: center; margin-top: 12px; }
+
+.hidden { display: none !important; }
 .btn-secondary {
   flex: 1; padding: 12px; background: rgba(255,255,255,0.06); color: var(--text);
   border: 1px solid var(--card-border); border-radius: 12px; font-size: 15px; cursor: pointer;

@@ -12,6 +12,7 @@ const App = {
 
   init() {
     this.load();
+    FirebaseSync.init();
     this.bindEvents();
     this.setDefaultDates();
     this.render();
@@ -249,6 +250,21 @@ const App = {
 
   // --- Events ---
   bindEvents() {
+    // Login
+    document.getElementById('btn-login').addEventListener('click', () => this.open('modal-login'));
+    document.getElementById('login-close').addEventListener('click', () => this.close('modal-login'));
+    document.getElementById('modal-login').addEventListener('click', e => { if (e.target.id === 'modal-login') this.close('modal-login'); });
+    document.getElementById('btn-google-login').addEventListener('click', async () => {
+      try { await FirebaseSync.signInGoogle(); this.close('modal-login'); } catch (e) { alert('Error: ' + e.message); }
+    });
+    document.getElementById('form-email-login').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try { await FirebaseSync.signInEmail(document.getElementById('login-email').value, document.getElementById('login-password').value); this.close('modal-login'); } catch (err) { alert('Error: ' + err.message); }
+    });
+    document.getElementById('btn-logout').addEventListener('click', async () => {
+      if (confirm('¿Cerrar sesión? Tus datos siguen en este dispositivo.')) await FirebaseSync.signOut();
+    });
+
     // Bottom nav
     document.querySelectorAll('.nav-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -313,6 +329,7 @@ const App = {
       this.settings[key] = +document.getElementById(id).value;
     }
     this.save();
+    if (FirebaseSync.isLoggedIn()) FirebaseSync.saveToCloud();
     this.render();
     this.close('modal-settings');
   },
@@ -330,6 +347,7 @@ const App = {
 
     this.settings.cash = amount; // Update current cash
     this.save();
+    if (FirebaseSync.isLoggedIn()) FirebaseSync.saveToCloud();
     this.render();
     this.close('modal-saving');
     document.getElementById('save-amount').value = '';
@@ -348,6 +366,7 @@ const App = {
 
     this.settings.housePrice = price;
     this.save();
+    if (FirebaseSync.isLoggedIn()) FirebaseSync.saveToCloud();
     this.render();
     this.close('modal-house');
     document.getElementById('house-amount').value = '';
