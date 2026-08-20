@@ -107,6 +107,46 @@ header h1 { font-size: 20px; font-weight: 700; }
 .nav-icon { font-size: 20px; }
 .nav-label { font-weight: 600; }
 
+/* Milestone */
+.milestone {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent-light);
+  margin-bottom: 8px;
+  text-align: center;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* Chart */
+.chart-container {
+  padding: 12px 0 0;
+}
+
+#chart-canvas {
+  width: 100%;
+  display: block;
+}
+
+/* Edit button */
+.data-edit {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 6px;
+  margin-left: 4px;
+}
+
+.data-edit:active {
+  color: var(--accent-light);
+}
+
 /* Scenario toggle */
 .scenario-toggle { display: flex; gap: 8px; margin-bottom: 16px; }
 .scenario-btn {

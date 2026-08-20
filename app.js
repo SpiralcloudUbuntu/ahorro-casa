@@ -1,4 +1,4 @@
-// Ahorro Casa PWA — v2
+// Ahorro Casa PWA — v3
 const App = {
   settings: {
     housePrice: 400000, entryPct: 10, taxesPct: 10, houseInc: 5,
@@ -6,8 +6,8 @@ const App = {
     spy: 316, msci: 58, gold: 51, cash: 1410, spyMonthly: 50,
     loan1: 5544, loan2: 15924, loanMonthly: 279
   },
-  savings: [],   // {date, amount, note}
-  housePrices: [], // {date, price, note}
+  savings: [],
+  housePrices: [],
   scenario: 'solo',
 
   init() {
@@ -37,7 +37,6 @@ const App = {
 
   setDefaultDates() {
     const today = new Date().toISOString().split('T')[0];
-    const ym = today.substring(0, 7);
     document.getElementById('save-date').value = today;
     document.getElementById('house-date').value = today;
   },
@@ -45,6 +44,14 @@ const App = {
   // --- Calculations ---
   get totalSaved() {
     return this.settings.spy + this.settings.msci + this.settings.gold + this.settings.cash;
+  },
+
+  get totalDebt() {
+    return this.settings.loan1 + this.settings.loan2;
+  },
+
+  get netWorth() {
+    return this.totalSaved - this.totalDebt;
   },
 
   get targetToday() {
@@ -70,31 +77,51 @@ const App = {
     return 360;
   },
 
-  // Calculator averages
+  // Better savings rate using linear regression
   calcSavingsRate() {
     if (this.savings.length < 2) return null;
     const sorted = [...this.savings].sort((a, b) => a.date.localeCompare(b.date));
-    const first = sorted[0];
-    const last = sorted[sorted.length - 1];
-    const days = (new Date(last.date) - new Date(first.date)) / (1000 * 60 * 60 * 24);
-    if (days <= 0) return null;
-    const amountDiff = last.amount - first.amount;
-    const daily = amountDiff / days;
+    
+    // Linear regression: y = mx + b
+    const n = sorted.length;
+    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+    const baseDate = new Date(sorted[0].date).getTime();
+    
+    sorted.forEach(s => {
+      const x = (new Date(s.date).getTime() - baseDate) / (1000 * 60 * 60 * 24); // days
+      const y = s.amount;
+      sumX += x;
+      sumY += y;
+      sumXY += x * y;
+      sumX2 += x * x;
+    });
+    
+    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    const daily = slope;
     const monthly = daily * 30;
-    return { daily, monthly, days };
+    const totalDays = (new Date(sorted[n-1].date).getTime() - baseDate) / (1000 * 60 * 60 * 24);
+    
+    return { daily, monthly, days: totalDays, entries: n };
   },
 
   calcHouseRate() {
     if (this.housePrices.length < 2) return null;
     const sorted = [...this.housePrices].sort((a, b) => a.date.localeCompare(b.date));
-    const first = sorted[0];
-    const last = sorted[sorted.length - 1];
-    const days = (new Date(last.date) - new Date(first.date)) / (1000 * 60 * 60 * 24);
-    if (days <= 0) return null;
-    const priceDiff = last.price - first.price;
-    const daily = priceDiff / days;
-    const monthly = daily * 30;
-    return { daily, monthly };
+    const n = sorted.length;
+    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+    const baseDate = new Date(sorted[0].date).getTime();
+    
+    sorted.forEach(h => {
+      const x = (new Date(h.date).getTime() - baseDate) / (1000 * 60 * 60 * 24);
+      const y = h.price;
+      sumX += x;
+      sumY += y;
+      sumXY += x * y;
+      sumX2 += x * x;
+    });
+    
+    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    return { daily: slope, monthly: slope * 30 };
   },
 
   calcRealCountdown() {
@@ -109,15 +136,23 @@ const App = {
     let months = 0;
     let saved = currentSaved;
     let housePrice = currentHouse;
-    const maxMonths = 360;
 
-    while (months < maxMonths) {
+    while (months < 360) {
       months++;
       saved += sr.monthly;
       if (hr) housePrice += hr.monthly;
-      const target = housePrice * entryPct;
-      if (saved >= target) return months;
+      if (saved >= housePrice * entryPct) return months;
     }
+    return null;
+  },
+
+  // Milestones
+  getMilestone() {
+    const pct = (this.totalSaved / this.targetToday) * 100;
+    if (pct >= 100) return { emoji: '🎉', text: '¡Objetivo alcanzado!' };
+    if (pct >= 75) return { emoji: '🔥', text: '¡Estás muy cerca!' };
+    if (pct >= 50) return { emoji: '💪', text: '¡Mitad del camino!' };
+    if (pct >= 25) return { emoji: '🚀', text: '¡Buen progreso!' };
     return null;
   },
 
@@ -144,6 +179,16 @@ const App = {
     document.getElementById('saved-amount').textContent = this.n(this.totalSaved);
     document.getElementById('target-amount').textContent = this.n(this.targetToday);
 
+    // Milestone
+    const milestone = this.getMilestone();
+    const milestoneEl = document.getElementById('milestone');
+    if (milestone && pct < 100) {
+      milestoneEl.textContent = `${milestone.emoji} ${milestone.text}`;
+      milestoneEl.classList.remove('hidden');
+    } else {
+      milestoneEl.classList.add('hidden');
+    }
+
     // Countdown
     if (months <= 0) {
       document.getElementById('countdown').textContent = '¡Ya puedes!';
@@ -164,22 +209,28 @@ const App = {
     document.getElementById('stat-house-then').textContent = this.n(Math.round(houseThen)) + ' €';
     document.getElementById('stat-entry').textContent = this.n(Math.round(targetThen)) + ' €';
 
-    // Breakdown
+    // Breakdown - Patrimonio
     document.getElementById('bd-spy').textContent = this.n(this.settings.spy) + ' €';
     document.getElementById('bd-msci').textContent = this.n(this.settings.msci) + ' €';
     document.getElementById('bd-gold').textContent = this.n(this.settings.gold) + ' €';
     document.getElementById('bd-cash').textContent = this.n(this.settings.cash) + ' €';
     document.getElementById('bd-total').textContent = this.n(this.totalSaved) + ' €';
+
+    // Breakdown - Préstamos
     document.getElementById('bd-loan1').textContent = this.n(this.settings.loan1) + ' €';
     document.getElementById('bd-loan2').textContent = this.n(this.settings.loan2) + ' €';
     document.getElementById('bd-loan-m').textContent = this.n(this.settings.loanMonthly) + ' €/mes';
+
+    // Net worth
+    const nw = this.netWorth;
+    document.getElementById('bd-net-worth').textContent = (nw >= 0 ? '' : '-') + this.n(Math.abs(nw)) + ' €';
+    document.getElementById('bd-net-worth').style.color = nw >= 0 ? '#00b894' : '#ff6b6b';
 
     // Scenario buttons
     document.querySelectorAll('.scenario-btn').forEach(b => b.classList.toggle('active', b.dataset.scenario === this.scenario));
   },
 
   renderCalculadora() {
-    // Savings rate estimate
     const sr = this.calcSavingsRate();
     const hr = this.calcHouseRate();
     const rc = this.calcRealCountdown();
@@ -192,16 +243,16 @@ const App = {
       const y = Math.floor(rc / 12), m = Math.round(rc % 12);
       document.getElementById('est-countdown').textContent = y > 0 ? `${y} años y ${m} meses` : `${m} meses`;
     } else {
-      document.getElementById('est-countdown').textContent = 'Necesita más datos';
+      document.getElementById('est-countdown').textContent = sr ? 'Ahorro insuficiente' : 'Introduce 2+ datos';
     }
 
     // Savings list
     const sl = document.getElementById('savings-list');
     if (this.savings.length === 0) {
-      sl.innerHTML = '<p class="data-empty">Sin datos. Pulsa "+ Añadir" cada vez que quieras registrar.</p>';
+      sl.innerHTML = '<p class="data-empty">Sin datos. Pulsa "+ Añadir" para registrar tu ahorro actual.</p>';
     } else {
       const sorted = [...this.savings].sort((a, b) => b.date.localeCompare(a.date));
-      sl.innerHTML = sorted.map((s, i) => `
+      sl.innerHTML = sorted.map(s => `
         <div class="data-item">
           <div>
             <div class="data-date">${this.fmtDate(s.date)}</div>
@@ -209,7 +260,8 @@ const App = {
           </div>
           <div class="data-right">
             <span class="data-value">${this.n(s.amount)} €</span>
-            <button class="data-delete" data-type="saving" data-date="${s.date}">✕</button>
+            <button class="data-edit" data-type="saving" data-date="${s.date}" title="Editar">✏️</button>
+            <button class="data-delete" data-type="saving" data-date="${s.date}" title="Eliminar">✕</button>
           </div>
         </div>
       `).join('');
@@ -229,23 +281,101 @@ const App = {
           </div>
           <div class="data-right">
             <span class="data-value">${this.n(h.price)} €</span>
-            <button class="data-delete" data-type="house" data-date="${h.date}">✕</button>
+            <button class="data-edit" data-type="house" data-date="${h.date}" title="Editar">✏️</button>
+            <button class="data-delete" data-type="house" data-date="${h.date}" title="Eliminar">✕</button>
           </div>
         </div>
       `).join('');
     }
 
+    // Chart
+    this.renderChart();
+
+    // Edit buttons
+    document.querySelectorAll('.data-edit').forEach(btn => {
+      btn.addEventListener('click', () => this.editEntry(btn.dataset.type, btn.dataset.date));
+    });
+
     // Delete buttons
     document.querySelectorAll('.data-delete').forEach(btn => {
       btn.addEventListener('click', () => {
+        if (!confirm('¿Eliminar esta entrada?')) return;
         const type = btn.dataset.type;
         const date = btn.dataset.date;
         if (type === 'saving') this.savings = this.savings.filter(s => s.date !== date);
         else this.housePrices = this.housePrices.filter(h => h.date !== date);
         this.save();
+        if (FirebaseSync.isLoggedIn()) FirebaseSync.saveToCloud();
         this.render();
       });
     });
+  },
+
+  renderChart() {
+    const canvas = document.getElementById('chart-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width = canvas.parentElement.offsetWidth - 40;
+    const h = canvas.height = 160;
+    ctx.clearRect(0, 0, w, h);
+
+    if (this.savings.length < 2) {
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.font = '12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Introduce 2+ datos para ver el gráfico', w/2, h/2);
+      return;
+    }
+
+    const sorted = [...this.savings].sort((a, b) => a.date.localeCompare(b.date));
+    const values = sorted.map(s => s.amount);
+    const minV = Math.min(...values) * 0.9;
+    const maxV = Math.max(...values) * 1.1;
+    const range = maxV - minV || 1;
+
+    const padX = 40, padY = 20;
+    const chartW = w - padX * 2;
+    const chartH = h - padY * 2;
+
+    // Grid lines
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const y = padY + (chartH / 4) * i;
+      ctx.beginPath();
+      ctx.moveTo(padX, y);
+      ctx.lineTo(w - padX, y);
+      ctx.stroke();
+    }
+
+    // Line
+    ctx.strokeStyle = '#6c5ce7';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    sorted.forEach((s, i) => {
+      const x = padX + (i / (sorted.length - 1)) * chartW;
+      const y = padY + chartH - ((s.amount - minV) / range) * chartH;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // Dots
+    sorted.forEach((s, i) => {
+      const x = padX + (i / (sorted.length - 1)) * chartW;
+      const y = padY + chartH - ((s.amount - minV) / range) * chartH;
+      ctx.fillStyle = '#6c5ce7';
+      ctx.beginPath();
+      ctx.arc(x, y, 4, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Labels
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(this.n(maxV) + '€', padX - 4, padY + 4);
+    ctx.fillText(this.n(minV) + '€', padX - 4, padY + chartH + 4);
   },
 
   // --- Events ---
@@ -272,6 +402,7 @@ const App = {
         btn.classList.add('active');
         document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
         document.getElementById('tab-' + btn.dataset.tab).classList.remove('hidden');
+        if (btn.dataset.tab === 'calculadora') this.renderChart();
       });
     });
 
@@ -284,37 +415,35 @@ const App = {
     document.getElementById('btn-settings').addEventListener('click', () => this.openSettings());
     document.getElementById('settings-close').addEventListener('click', () => this.close('modal-settings'));
     document.getElementById('btn-save-settings').addEventListener('click', () => this.saveSettings());
-    document.getElementById('btn-reset').addEventListener('click', () => { if (confirm('¿Reset?')) { localStorage.clear(); location.reload(); } });
+    document.getElementById('btn-reset').addEventListener('click', () => { if (confirm('¿Reset? Se borrarán todos los datos.')) { localStorage.clear(); location.reload(); } });
 
     // Add saving
-    document.getElementById('btn-add-saving').addEventListener('click', () => this.open('modal-saving'));
+    document.getElementById('btn-add-saving').addEventListener('click', () => this.openEntryModal('saving'));
     document.getElementById('saving-close').addEventListener('click', () => this.close('modal-saving'));
-    document.getElementById('btn-do-save').addEventListener('click', () => this.addSaving());
+    document.getElementById('btn-do-save').addEventListener('click', () => this.saveEntry('saving'));
 
     // Add house
-    document.getElementById('btn-add-house').addEventListener('click', () => this.open('modal-house'));
+    document.getElementById('btn-add-house').addEventListener('click', () => this.openEntryModal('house'));
     document.getElementById('house-close').addEventListener('click', () => this.close('modal-house'));
-    document.getElementById('btn-do-house').addEventListener('click', () => this.addHouse());
+    document.getElementById('btn-do-house').addEventListener('click', () => this.saveEntry('house'));
 
     // Close on backdrop
-    ['modal-settings', 'modal-saving', 'modal-house'].forEach(id => {
+    ['modal-settings', 'modal-saving', 'modal-house', 'modal-login'].forEach(id => {
       document.getElementById(id).addEventListener('click', e => { if (e.target === document.getElementById(id)) this.close(id); });
     });
   },
 
   openSettings() {
     const s = this.settings;
-    ['set-house-price', 'set-entry-pct', 'set-taxes-pct', 'set-house-inc', 'set-solo-m', 'set-both-m',
-     'set-spy', 'set-msci', 'set-gold', 'set-cash', 'set-spy-m', 'set-l1', 'set-l2', 'set-lm'].forEach(id => {
-      const el = document.getElementById(id);
-      const key = {
-        'set-house-price': 'housePrice', 'set-entry-pct': 'entryPct', 'set-taxes-pct': 'taxesPct',
-        'set-house-inc': 'houseInc', 'set-solo-m': 'soloMonthly', 'set-both-m': 'bothMonthly',
-        'set-spy': 'spy', 'set-msci': 'msci', 'set-gold': 'gold', 'set-cash': 'cash',
-        'set-spy-m': 'spyMonthly', 'set-l1': 'loan1', 'set-l2': 'loan2', 'set-lm': 'loanMonthly'
-      }[id];
-      if (key) el.value = s[key];
-    });
+    const map = {
+      'set-house-price': 'housePrice', 'set-entry-pct': 'entryPct', 'set-taxes-pct': 'taxesPct',
+      'set-house-inc': 'houseInc', 'set-solo-m': 'soloMonthly', 'set-both-m': 'bothMonthly',
+      'set-spy': 'spy', 'set-msci': 'msci', 'set-gold': 'gold', 'set-cash': 'cash',
+      'set-spy-m': 'spyMonthly', 'set-l1': 'loan1', 'set-l2': 'loan2', 'set-lm': 'loanMonthly'
+    };
+    for (const [id, key] of Object.entries(map)) {
+      document.getElementById(id).value = s[key];
+    }
     this.open('modal-settings');
   },
 
@@ -334,43 +463,76 @@ const App = {
     this.close('modal-settings');
   },
 
-  addSaving() {
-    const date = document.getElementById('save-date').value;
-    const amount = +document.getElementById('save-amount').value;
-    const note = document.getElementById('save-note').value.trim();
-    if (!date || !amount) return;
+  // Unified entry modal (add + edit)
+  _editing: null, // { type: 'saving'|'house', date: '...' }
 
-    // Update or add
-    const idx = this.savings.findIndex(s => s.date === date);
-    if (idx >= 0) this.savings[idx] = { date, amount, note };
-    else this.savings.push({ date, amount, note });
+  openEntryModal(type, existingData) {
+    this._editing = existingData ? { type, date: existingData.date } : null;
+    const modalId = type === 'saving' ? 'modal-saving' : 'modal-house';
+    const dateEl = document.getElementById(type === 'saving' ? 'save-date' : 'house-date');
+    const amountEl = document.getElementById(type === 'saving' ? 'save-amount' : 'house-amount');
+    const noteEl = document.getElementById(type === 'saving' ? 'save-note' : 'house-note');
+    const titleEl = document.querySelector(`#${modalId} .modal-header h2`);
 
-    this.settings.cash = amount; // Update current cash
-    this.save();
-    if (FirebaseSync.isLoggedIn()) FirebaseSync.saveToCloud();
-    this.render();
-    this.close('modal-saving');
-    document.getElementById('save-amount').value = '';
-    document.getElementById('save-note').value = '';
+    if (existingData) {
+      dateEl.value = existingData.date;
+      amountEl.value = existingData.amount || existingData.price;
+      noteEl.value = existingData.note || '';
+      titleEl.textContent = type === 'saving' ? '✏️ Editar ahorro' : '✏️ Editar precio';
+    } else {
+      dateEl.value = new Date().toISOString().split('T')[0];
+      amountEl.value = '';
+      noteEl.value = '';
+      titleEl.textContent = type === 'saving' ? '💰 Registrar ahorro' : '🏠 Registrar precio';
+    }
+    this.open(modalId);
   },
 
-  addHouse() {
-    const date = document.getElementById('house-date').value;
-    const price = +document.getElementById('house-amount').value;
-    const note = document.getElementById('house-note').value.trim();
-    if (!date || !price) return;
+  saveEntry(type) {
+    const dateEl = document.getElementById(type === 'saving' ? 'save-date' : 'house-date');
+    const amountEl = document.getElementById(type === 'saving' ? 'save-amount' : 'house-amount');
+    const noteEl = document.getElementById(type === 'saving' ? 'save-note' : 'house-note');
 
-    const idx = this.housePrices.findIndex(h => h.date === date);
-    if (idx >= 0) this.housePrices[idx] = { date, price, note };
-    else this.housePrices.push({ date, price, note });
+    const date = dateEl.value;
+    const amount = +amountEl.value;
+    const note = noteEl.value.trim();
+    if (!date || !amount) return;
 
-    this.settings.housePrice = price;
+    if (type === 'saving') {
+      if (this._editing && this._editing.type === 'saving') {
+        // Edit existing
+        const idx = this.savings.findIndex(s => s.date === this._editing.date);
+        if (idx >= 0) this.savings[idx] = { date, amount, note };
+      } else {
+        const idx = this.savings.findIndex(s => s.date === date);
+        if (idx >= 0) this.savings[idx] = { date, amount, note };
+        else this.savings.push({ date, amount, note });
+      }
+    } else {
+      if (this._editing && this._editing.type === 'house') {
+        const idx = this.housePrices.findIndex(h => h.date === this._editing.date);
+        if (idx >= 0) this.housePrices[idx] = { date, price: amount, note };
+      } else {
+        const idx = this.housePrices.findIndex(h => h.date === date);
+        if (idx >= 0) this.housePrices[idx] = { date, price: amount, note };
+        else this.housePrices.push({ date, price: amount, note });
+      }
+      this.settings.housePrice = amount;
+    }
+
+    this._editing = null;
     this.save();
     if (FirebaseSync.isLoggedIn()) FirebaseSync.saveToCloud();
     this.render();
-    this.close('modal-house');
-    document.getElementById('house-amount').value = '';
-    document.getElementById('house-note').value = '';
+    this.close(type === 'saving' ? 'modal-saving' : 'modal-house');
+    amountEl.value = '';
+    noteEl.value = '';
+  },
+
+  editEntry(type, date) {
+    const arr = type === 'saving' ? this.savings : this.housePrices;
+    const entry = arr.find(e => e.date === date);
+    if (entry) this.openEntryModal(type, entry);
   },
 
   open(id) { document.getElementById(id).classList.remove('hidden'); },

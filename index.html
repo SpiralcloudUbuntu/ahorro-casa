@@ -43,6 +43,7 @@
             <span class="progress-label">completado</span>
           </div>
         </div>
+        <div id="milestone" class="milestone hidden"></div>
         <div class="hero-info">
           <div class="hero-amount"><span class="hero-currency">€</span><span id="saved-amount">0</span></div>
           <div class="hero-target">de <span id="target-amount">80.000</span> € necesarios</div>
@@ -91,17 +92,18 @@
           <div class="breakdown-item"><span class="breakdown-dot" style="background:#2ecc71"></span><span class="breakdown-label">MSCI World</span><span class="breakdown-value" id="bd-msci">—</span></div>
           <div class="breakdown-item"><span class="breakdown-dot" style="background:#f39c12"></span><span class="breakdown-label">Oro</span><span class="breakdown-value" id="bd-gold">—</span></div>
           <div class="breakdown-item"><span class="breakdown-dot" style="background:#9b59b6"></span><span class="breakdown-label">Efectivo TR</span><span class="breakdown-value" id="bd-cash">—</span></div>
-          <div class="breakdown-item total"><span class="breakdown-dot" style="background:transparent"></span><span class="breakdown-label">Total</span><span class="breakdown-value" id="bd-total">—</span></div>
+          <div class="breakdown-item total"><span class="breakdown-dot" style="background:transparent"></span><span class="breakdown-label">Total activos</span><span class="breakdown-value" id="bd-total">—</span></div>
         </div>
       </div>
 
-      <!-- Préstamos -->
+      <!-- Préstamos + Patrimonio neto -->
       <div class="breakdown-card">
         <h3>Préstamos</h3>
         <div class="breakdown-list">
           <div class="breakdown-item"><span class="breakdown-dot" style="background:#e74c3c"></span><span class="breakdown-label">*8602</span><span class="breakdown-value" id="bd-loan1">—</span></div>
           <div class="breakdown-item"><span class="breakdown-dot" style="background:#e74c3c"></span><span class="breakdown-label">*7491</span><span class="breakdown-value" id="bd-loan2">—</span></div>
           <div class="breakdown-item"><span class="breakdown-dot" style="background:#e74c3c"></span><span class="breakdown-label">Cuota mensual</span><span class="breakdown-value" id="bd-loan-m">—</span></div>
+          <div class="breakdown-item total"><span class="breakdown-dot" style="background:transparent"></span><span class="breakdown-label">Patrimonio neto</span><span class="breakdown-value" id="bd-net-worth">—</span></div>
         </div>
       </div>
     </section>
@@ -139,6 +141,9 @@
         </div>
         <div id="savings-list" class="data-list">
           <p class="data-empty">Sin datos. Pulsa "+ Añadir" cada vez que quieras registrar.</p>
+        </div>
+        <div class="chart-container">
+          <canvas id="chart-canvas"></canvas>
         </div>
       </div>
 
