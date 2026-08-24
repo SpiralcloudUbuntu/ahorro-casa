@@ -513,7 +513,7 @@ const App = {
   _buy: null,
   _valueAsset: null,
   openBuyModal(assetId, existingLot) {
-    this._buy = existingLot ? { assetId, date: existingLot.date } : null;
+    this._buy = existingLot ? { assetId, date: existingLot.date } : { assetId: assetId, date: null };
     const a = this.assetById(assetId);
     document.getElementById('buy-asset').value = a.name;
     document.getElementById('buy-title').textContent = existingLot ? '✏️ Editar compra' : '💸 Registrar compra';
