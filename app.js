@@ -17,6 +17,20 @@ const App = {
     this.bindEvents();
     this.setDefaultDates();
     this.render();
+    this.pinNav();
+  },
+  pinNav() {
+    const nav = document.querySelector('.bottom-nav');
+    if (!nav) return;
+    nav.style.position = 'fixed';
+    nav.style.bottom = '0';
+    nav.style.left = '0';
+    nav.style.right = '0';
+    nav.style.width = '100%';
+    nav.style.display = 'flex';
+    nav.style.zIndex = '999999';
+    nav.style.background = '#0a0a1a';
+    nav.style.transform = 'none';
   },
 
   load() {

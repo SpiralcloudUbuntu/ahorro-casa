@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ahorro-v5';
+const CACHE_NAME = 'ahorro-v6';
 const ASSETS = ['/ahorro-casa/','/ahorro-casa/index.html','/ahorro-casa/style.css','/ahorro-casa/app.js','/ahorro-casa/firebase-sync.js','/ahorro-casa/manifest.json'];
 
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(ASSETS))); self.skipWaiting(); });

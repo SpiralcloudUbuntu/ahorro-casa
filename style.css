@@ -85,9 +85,7 @@ header h1 { font-size: 20px; font-weight: 700; }
   width: 100% !important;
   margin: 0 !important;
   transform: none !important;
-  background: rgba(10,10,26,0.97);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: #0a0a1a;
   border-top: 1px solid var(--card-border);
   display: flex;
   z-index: 999999 !important;
