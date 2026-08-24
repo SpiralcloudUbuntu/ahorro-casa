@@ -28,6 +28,7 @@ const App = {
       const db = localStorage.getItem('ahc-debts');
       if (db) this.debts = JSON.parse(db);
       if (!Array.isArray(this.debts) || this.debts.length === 0) this.seedDebts();
+      this.normalize();
     } catch (e) {}
   },
 
@@ -49,9 +50,27 @@ const App = {
 
   seedDebts() {
     this.debts = [
-      { id: 'l1', name: 'Préstamo *8602', pending: 5544, monthly: 69 },
-      { id: 'l2', name: 'Préstamo *7491', pending: 15924, monthly: 210 }
+      { id: 'l1', name: 'Préstamo *8602', initial: 5544, remaining: 5544, tin: 4.2, tae: null, totalMonths: null, remainingMonths: null, monthly: 69 },
+      { id: 'l2', name: 'Préstamo *7491', initial: 15924, remaining: 15924, tin: 4.2, tae: null, totalMonths: null, remainingMonths: null, monthly: 210 }
     ];
+  },
+
+  normalize() {
+    if (!Array.isArray(this.portfolio) || this.portfolio.length === 0) this.seedPortfolio();
+    this.portfolio.forEach(a => {
+      if (!a.lots || !Array.isArray(a.lots)) a.lots = [];
+      if (!Array.isArray(a.history)) a.history = [];
+    });
+    if (!Array.isArray(this.debts) || this.debts.length === 0) this.seedDebts();
+    this.debts.forEach(d => {
+      if (d.remaining === undefined && d.pending !== undefined) d.remaining = d.pending;
+      if (d.initial === undefined) d.initial = d.remaining !== undefined ? d.remaining : 0;
+      if (d.tin === undefined) d.tin = null;
+      if (d.tae === undefined) d.tae = null;
+      if (d.totalMonths === undefined) d.totalMonths = null;
+      if (d.remainingMonths === undefined) d.remainingMonths = null;
+      if (d.monthly === undefined) d.monthly = null;
+    });
   },
 
   setDefaultDates() {
@@ -64,7 +83,7 @@ const App = {
   get ahorroCash() {
     return this.savings.length > 0 ? this.savings[this.savings.length - 1].amount : 0;
   },
-  costBasis(a) { return a.lots.reduce((s, l) => s + l.cost, 0); },
+  costBasis(a) { return (a.lots || []).reduce((s, l) => s + (l.cost || 0), 0); },
   assetValue(a) { return a.current !== null && a.current !== undefined ? a.current : this.costBasis(a); },
   get portfolioValue() { return this.portfolio.reduce((s, a) => s + this.assetValue(a), 0); },
   get totalSaved() { return this.ahorroCash + this.portfolioValue; },
@@ -126,10 +145,10 @@ const App = {
 
   // ---- Render ----
   render() {
-    this.renderSituacion();
-    this.renderAhorro();
-    this.renderCartera();
-    this.renderDeudas();
+    try { this.renderSituacion(); } catch (e) { console.error('situacion', e); }
+    try { this.renderAhorro(); } catch (e) { console.error('ahorro', e); }
+    try { this.renderCartera(); } catch (e) { console.error('cartera', e); }
+    try { this.renderDeudas(); } catch (e) { console.error('deudas', e); }
   },
 
   renderSituacion() {
@@ -333,14 +352,14 @@ const App = {
     const w = canvas.width = (canvas.parentElement.offsetWidth || 300) - 6;
     const h = canvas.height = 140;
     ctx.clearRect(0, 0, w, h);
-    if (a.history.length < 2) {
+    if (!Array.isArray(a.history) || a.history.length < 2) {
       ctx.fillStyle = 'rgba(255,255,255,0.3)';
       ctx.font = '11px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('Actualiza el valor al menos 2 días para ver la gráfica', w / 2, h / 2);
       return;
     }
-    const sorted = [...a.history].sort((x, y) => x.date.localeCompare(y.date));
+    const sorted = [...(a.history || [])].sort((x, y) => x.date.localeCompare(y.date));
     const vp = sorted.map(p => p.value);
     const cb = this.costBasis(a);
     const gp = sorted.map(p => p.value - cb);
@@ -385,28 +404,58 @@ const App = {
   },
 
   renderDeudas() {
-    const t = this.debts.reduce((s, d) => s + d.pending, 0);
-    const m = this.debts.reduce((s, d) => s + d.monthly, 0);
+    const t = this.debts.reduce((s, d) => s + (d.remaining || 0), 0);
+    const cuotaTot = this.debts.reduce((s, d) => s + this.debtCuota(d), 0);
     document.getElementById('dq-total').textContent = this.n(t) + ' €';
-    document.getElementById('dq-monthly').textContent = this.n(m) + ' €/mes';
+    document.getElementById('dq-monthly').textContent = this.n(cuotaTot) + ' €/mes';
 
     const list = document.getElementById('debt-list');
     list.innerHTML = this.debts.map(d => {
-      const months = d.monthly > 0 ? Math.ceil(d.pending / d.monthly) : 0;
+      const cuota = this.debtCuota(d);
+      const restMon = d.remainingMonths !== null ? d.remainingMonths : '—';
+      const totMon = d.totalMonths !== null ? d.totalMonths : '—';
+      const pct = d.initial && d.initial > 0 ? Math.min(100, Math.round((1 - d.remaining / d.initial) * 100)) : 0;
       return `
         <div class="calc-section">
           <div class="calc-header">
             <h3>🏦 ${d.name}</h3>
-            <button class="btn-small" data-editdeb="${d.id}">✏️ Actualizar</button>
+            <div style="display:flex;gap:6px">
+              <button class="btn-small" data-pay="${d.id}" title="Descontar mes">📉 Pagar mes</button>
+              <button class="btn-small" data-editdeb="${d.id}" title="Editar">✏️</button>
+            </div>
           </div>
           <div class="breakdown-list">
-            <div class="breakdown-item"><span class="breakdown-dot" style="background:#e74c3c"></span><span class="breakdown-label">Pendiente</span><span class="breakdown-value">${this.n(d.pending)} €</span></div>
-            <div class="breakdown-item"><span class="breakdown-dot" style="background:#ff7675"></span><span class="breakdown-label">Cuota / mes</span><span class="breakdown-value">${this.n(d.monthly)} €</span></div>
-            <div class="breakdown-item"><span class="breakdown-dot" style="background:transparent"></span><span class="breakdown-label">Pago en ~</span><span class="breakdown-value" style="color:${d.monthly>0?'#a29bfe':'var(--text-dim)'}">${months > 0 ? months + ' meses' : '—'}</span></div>
+            <div class="breakdown-item"><span class="breakdown-dot" style="background:#e74c3c"></span><span class="breakdown-label">Inicial</span><span class="breakdown-value">${this.n(d.initial || 0)} €</span></div>
+            <div class="breakdown-item"><span class="breakdown-dot" style="background:#ff7675"></span><span class="breakdown-label">Restante</span><span class="breakdown-value">${this.n(d.remaining)} €</span></div>
+            <div class="breakdown-item"><span class="breakdown-dot" style="background:#74b9ff"></span><span class="breakdown-label">TIN / TAE</span><span class="breakdown-value">${d.tin ?? '—'}% / ${d.tae ?? '—'}%</span></div>
+            <div class="breakdown-item"><span class="breakdown-dot" style="background:#55efc4"></span><span class="breakdown-label">Meses rest/total</span><span class="breakdown-value">${restMon} / ${totMon}</span></div>
+            <div class="breakdown-item"><span class="breakdown-dot" style="background:transparent"></span><span class="breakdown-label">Cuota aprox.</span><span class="breakdown-value">${cuota > 0 ? this.n(cuota) + ' €' : '—'}</span></div>
+            <div class="breakdown-item"><span class="breakdown-dot" style="background:transparent"></span><span class="breakdown-label">Progreso</span><span class="breakdown-value" style="color:#a29bfe">${pct}% pagado</span></div>
           </div>
         </div>`;
     }).join('');
+    list.querySelectorAll('[data-pay]').forEach(b => b.addEventListener('click', () => this.payDebtMonth(b.dataset.pay)));
     list.querySelectorAll('[data-editdeb]').forEach(b => b.addEventListener('click', () => this.openDebtModal(b.dataset.editdeb)));
+  },
+
+  debtCuota(d) {
+    if (d.monthly && d.monthly > 0) return d.monthly;
+    if (d.remainingMonths && d.remainingMonths > 0) return Math.round(d.remaining / d.remainingMonths);
+    return 0;
+  },
+
+  payDebtMonth(id) {
+    const d = this.debts.find(x => x.id === id);
+    if (!d) return;
+    const cuota = this.debtCuota(d) || Math.round(d.remaining);
+    const amt = prompt('Cuota pagada este mes (€):', cuota);
+    if (amt === null) return;
+    const p = +amt;
+    if (!(p > 0)) return;
+    d.remaining = Math.max(0, d.remaining - p);
+    if (d.remainingMonths !== null && d.remainingMonths > 0) d.remainingMonths -= 1;
+    this.save(); if (FirebaseSync.isLoggedIn()) FirebaseSync.saveToCloud();
+    this.render();
   },
 
   pfColor(id) { return id === 'spy' ? '#3498db' : id === 'msci' ? '#2ecc71' : '#f39c12'; },
@@ -515,18 +564,29 @@ const App = {
   openDebtModal(id) {
     this._debt = id;
     const d = this.debts.find(x => x.id === id);
+    if (!d) return;
     document.getElementById('debt-name').value = d.name;
-    document.getElementById('debt-pending').value = d.pending;
-    document.getElementById('debt-monthly').value = d.monthly;
+    document.getElementById('debt-initial').value = d.initial || 0;
+    document.getElementById('debt-remaining').value = d.remaining;
+    document.getElementById('debt-tin').value = d.tin ?? '';
+    document.getElementById('debt-tae').value = d.tae ?? '';
+    document.getElementById('debt-total-months').value = d.totalMonths ?? '';
+    document.getElementById('debt-rem-months').value = d.remainingMonths ?? '';
+    document.getElementById('debt-monthly').value = d.monthly ?? '';
     this.open('modal-debt');
   },
   saveDebt() {
     const d = this.debts.find(x => x.id === this._debt);
     if (!d) return;
-    const p = +document.getElementById('debt-pending').value;
-    const m = +document.getElementById('debt-monthly').value;
-    if (!(p >= 0)) return;
-    d.pending = p; d.monthly = m >= 0 ? m : d.monthly;
+    const num = el => { const v = +document.getElementById(el).value; return isNaN(v) ? 0 : v; };
+    const blank = el => document.getElementById(el).value === '';
+    d.initial = Math.max(0, num('debt-initial'));
+    d.remaining = Math.max(0, num('debt-remaining'));
+    d.tin = blank('debt-tin') ? null : num('debt-tin');
+    d.tae = blank('debt-tae') ? null : num('debt-tae');
+    d.totalMonths = blank('debt-total-months') ? null : Math.max(0, num('debt-total-months'));
+    d.remainingMonths = blank('debt-rem-months') ? null : Math.max(0, num('debt-rem-months'));
+    d.monthly = blank('debt-monthly') ? null : num('debt-monthly');
     this._debt = null;
     this.save(); if (FirebaseSync.isLoggedIn()) FirebaseSync.saveToCloud();
     this.render(); this.close('modal-debt');

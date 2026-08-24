@@ -74,6 +74,7 @@ const FirebaseSync = {
         if (data.housePrices && data.housePrices.length > 0) App.housePrices = data.housePrices;
         if (Array.isArray(data.portfolio) && data.portfolio.length > 0) App.portfolio = data.portfolio;
         if (Array.isArray(data.debts)) App.debts = data.debts;
+        App.normalize();
         App.save();
         App.render();
       } else {
