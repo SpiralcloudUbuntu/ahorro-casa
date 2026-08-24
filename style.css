@@ -78,16 +78,21 @@ header h1 { font-size: 20px; font-weight: 700; }
 
 /* Bottom nav */
 .bottom-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(10,10,26,0.95);
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  margin: 0 !important;
+  transform: none !important;
+  background: rgba(10,10,26,0.97);
   backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border-top: 1px solid var(--card-border);
   display: flex;
-  z-index: 200;
+  z-index: 999999 !important;
   padding-bottom: env(safe-area-inset-bottom);
+  max-height: none !important;
 }
 .nav-btn {
   flex: 1;
