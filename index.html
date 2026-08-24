@@ -157,33 +157,6 @@
           <p class="data-empty">Sin datos. Pulsa "+ Añadir" cuando busques o actualices precio.</p>
         </div>
       </div>
-    <!-- Tab: Cartera -->
-    <section id="tab-cartera" class="tab-content hidden">
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-icon">💰</div>
-          <div class="stat-label">Invertido</div>
-          <div class="stat-value" id="pf-cost">—</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">📈</div>
-          <div class="stat-label">Valor actual</div>
-          <div class="stat-value" id="pf-value">—</div>
-        </div>
-      </div>
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-icon">📊</div>
-          <div class="stat-label">Pérdidas / ganancias</div>
-          <div class="stat-value" id="pf-pnl">—</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">🧭</div>
-          <div class="stat-label">Rentabilidad</div>
-          <div class="stat-value" id="pf-pct">—</div>
-        </div>
-      </div>
-      <div id="portfolio-list"></div>
     </section>
 
     <!-- Bottom nav -->
@@ -195,10 +168,6 @@
       <button class="nav-btn" data-tab="calculadora">
         <span class="nav-icon">🧮</span>
         <span class="nav-label">Calculadora</span>
-      </button>
-      <button class="nav-btn" data-tab="cartera">
-        <span class="nav-icon">📈</span>
-        <span class="nav-label">Cartera</span>
       </button>
     </nav>
 
@@ -292,34 +261,6 @@
         <div class="form-group"><label>Precio vivienda (€)</label><input type="number" id="house-amount" placeholder="Ej: 400000"></div>
         <div class="form-group"><label>Nota (opcional)</label><input type="text" id="house-note" placeholder="Ej: piso Centro"></div>
         <div class="form-actions"><button id="btn-do-house" class="btn-primary">💾 Guardar</button></div>
-      </div>
-    </div>
-
-    <!-- Modal: Add purchase -->
-    <div id="modal-buy" class="modal hidden">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2 id="buy-title">💸 Registrar compra</h2>
-          <button class="btn-close" id="buy-close">✕</button>
-        </div>
-        <div class="form-group"><label>Activo</label><input type="text" id="buy-asset" disabled></div>
-        <div class="form-group"><label>Fecha</label><input type="date" id="buy-date"></div>
-        <div class="form-group"><label>Euros invertidos (€)</label><input type="number" id="buy-amount" placeholder="Ej: 50" step="0.01"></div>
-        <div class="form-group"><label>Nota (opcional)</label><input type="text" id="buy-note" placeholder="Ej: DCA marzo"></div>
-        <div class="form-actions"><button id="btn-do-buy" class="btn-primary">💾 Guardar</button></div>
-      </div>
-    </div>
-
-    <!-- Modal: Update current value -->
-    <div id="modal-value" class="modal hidden">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2>🔄 Actualizar valor</h2>
-          <button class="btn-close" id="value-close">✕</button>
-        </div>
-        <div class="form-group"><label>Activo</label><input type="text" id="value-asset" disabled></div>
-        <div class="form-group"><label>Valor actual en Trade Republic (€)</label><input type="number" id="value-input" placeholder="Ej: 380" step="0.01"></div>
-        <div class="form-actions"><button id="btn-do-value" class="btn-primary">💾 Guardar</button></div>
       </div>
     </div>
   </div>

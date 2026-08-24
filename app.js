@@ -8,7 +8,6 @@ const App = {
   },
   savings: [],
   housePrices: [],
-  portfolio: [],
   scenario: 'solo',
 
   init() {
@@ -27,9 +26,6 @@ const App = {
       if (sv) this.savings = JSON.parse(sv);
       const hp = localStorage.getItem('ahc-house');
       if (hp) this.housePrices = JSON.parse(hp);
-      const pf = localStorage.getItem('ahc-portfolio');
-      if (pf) this.portfolio = JSON.parse(pf);
-      if (!Array.isArray(this.portfolio) || this.portfolio.length === 0) this.seedPortfolio();
     } catch(e) {}
   },
 
@@ -37,7 +33,6 @@ const App = {
     localStorage.setItem('ahc-settings', JSON.stringify(this.settings));
     localStorage.setItem('ahc-savings', JSON.stringify(this.savings));
     localStorage.setItem('ahc-house', JSON.stringify(this.housePrices));
-    localStorage.setItem('ahc-portfolio', JSON.stringify(this.portfolio));
   },
 
   setDefaultDates() {
@@ -165,7 +160,6 @@ const App = {
   render() {
     this.renderSituacion();
     this.renderCalculadora();
-    this.renderCartera();
   },
 
   renderSituacion() {
@@ -409,7 +403,6 @@ const App = {
         document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
         document.getElementById('tab-' + btn.dataset.tab).classList.remove('hidden');
         if (btn.dataset.tab === 'calculadora') this.renderChart();
-        if (btn.dataset.tab === 'cartera') this.renderCartera();
       });
     });
 
@@ -434,14 +427,8 @@ const App = {
     document.getElementById('house-close').addEventListener('click', () => this.close('modal-house'));
     document.getElementById('btn-do-house').addEventListener('click', () => this.saveEntry('house'));
 
-    // Portfolio (Cartera)
-    document.getElementById('buy-close').addEventListener('click', () => this.close('modal-buy'));
-    document.getElementById('value-close').addEventListener('click', () => this.close('modal-value'));
-    document.getElementById('btn-do-buy').addEventListener('click', () => this.saveBuy());
-    document.getElementById('btn-do-value').addEventListener('click', () => this.saveValue());
-
     // Close on backdrop
-    ['modal-settings', 'modal-saving', 'modal-house', 'modal-buy', 'modal-value', 'modal-login'].forEach(id => {
+    ['modal-settings', 'modal-saving', 'modal-house', 'modal-login'].forEach(id => {
       document.getElementById(id).addEventListener('click', e => { if (e.target === document.getElementById(id)) this.close(id); });
     });
   },
@@ -546,152 +533,6 @@ const App = {
     const arr = type === 'saving' ? this.savings : this.housePrices;
     const entry = arr.find(e => e.date === date);
     if (entry) this.openEntryModal(type, entry);
-  },
-
-  // --- Portfolio / Cartera ---
-  money(v) { return (v ?? 0).toLocaleString('es-ES', { maximumFractionDigits: 2 }); },
-  seedPortfolio() {
-    this.portfolio = [
-      { id: 'spy', name: 'S&P 500', lots: [], current: null },
-      { id: 'msci', name: 'MSCI World', lots: [], current: null },
-      { id: 'gold', name: 'Oro', lots: [], current: null }
-    ];
-  },
-  assetById(id) { return this.portfolio.find(a => a.id === id); },
-  costBasis(a) { return a.lots.reduce((s, l) => s + l.cost, 0); },
-  assetValue(a) { return a.current !== null && a.current !== undefined ? a.current : this.costBasis(a); },
-
-  renderCartera() {
-    const totalCost = this.portfolio.reduce((s, a) => s + this.costBasis(a), 0);
-    const totalVal = this.portfolio.reduce((s, a) => s + this.assetValue(a), 0);
-    const pnl = totalVal - totalCost;
-    const pct = totalCost > 0 ? (pnl / totalCost) * 100 : 0;
-    const color = pnl > 0 ? '#00b894' : pnl < 0 ? '#ff6b6b' : '#e8e8f0';
-
-    document.getElementById('pf-cost').textContent = this.money(totalCost) + ' €';
-    document.getElementById('pf-value').textContent = this.money(totalVal) + ' €';
-    const pnlEl = document.getElementById('pf-pnl');
-    pnlEl.textContent = (pnl >= 0 ? '+' : '−') + this.money(Math.abs(pnl)) + ' €';
-    pnlEl.style.color = color;
-    const pctEl = document.getElementById('pf-pct');
-    pctEl.textContent = totalCost > 0 ? (pnl >= 0 ? '+' : '−') + this.money(Math.abs(pct)) + '%' : '—';
-    pctEl.style.color = color;
-
-    const list = document.getElementById('portfolio-list');
-    list.innerHTML = this.portfolio.map(a => {
-      const cb = this.costBasis(a);
-      const val = this.assetValue(a);
-      const apnl = val - cb;
-      const apct = cb > 0 ? (apnl / cb) * 100 : 0;
-      const acolor = apnl > 0 ? '#00b894' : apnl < 0 ? '#ff6b6b' : 'var(--text-dim)';
-      const dot = a.id === 'spy' ? '#3498db' : a.id === 'msci' ? '#2ecc71' : '#f39c12';
-      const dot2 = a.id === 'spy' ? '#74b9ff' : a.id === 'msci' ? '#55efc4' : '#ffeaa7';
-      const set = a.current !== null && a.current !== undefined;
-      const lotsHtml = a.lots.length === 0
-        ? '<p class="data-empty">Sin compras aún.</p>'
-        : [...a.lots].sort((x, y) => y.date.localeCompare(x.date)).map(l => `
-          <div class="data-item">
-            <div>
-              <div class="data-date">${this.fmtDate(l.date)}</div>
-              ${l.note ? `<div class="data-note">${l.note}</div>` : ''}
-            </div>
-            <div class="data-right">
-              <span class="data-value">${this.money(l.cost)} €</span>
-              <button class="data-edit" data-act="editlot" data-id="${a.id}" data-date="${l.date}" title="Editar">✏️</button>
-              <button class="data-delete" data-act="dellot" data-id="${a.id}" data-date="${l.date}" title="Eliminar">✕</button>
-            </div>
-          </div>`).join('');
-      return `
-        <div class="calc-section">
-          <div class="calc-header">
-            <h3>📊 ${a.name}</h3>
-            <button class="btn-small" data-act="buy" data-id="${a.id}" title="Registrar compra">＋ Compra</button>
-          </div>
-          <div class="breakdown-list" style="margin-bottom:10px">
-            <div class="breakdown-item"><span class="breakdown-dot" style="background:${dot}"></span><span class="breakdown-label">Coste</span><span class="breakdown-value">${this.money(cb)} €</span></div>
-            <div class="breakdown-item"><span class="breakdown-dot" style="background:${dot2}"></span><span class="breakdown-label">Valor actual</span><span class="breakdown-value">${set ? this.money(val) + ' €' : '—'}</span></div>
-            <div class="breakdown-item"><span class="breakdown-dot" style="background:transparent"></span><span class="breakdown-label">P/L</span><span class="breakdown-value" style="color:${acolor}">${apnl >= 0 ? '+' : '−'}${this.money(Math.abs(apnl))} € (${cb > 0 ? (apnl >= 0 ? '+' : '−') + this.money(Math.abs(apct)) + '%' : '—'})</span></div>
-          </div>
-          <div class="calc-header" style="border-top:1px solid var(--card-border); padding-top:10px">
-            <span style="font-size:12px;color:var(--text-dim)">Compras</span>
-            <button class="btn-small" data-act="value" data-id="${a.id}" title="Actualizar valor actual">🔄 Valor</button>
-          </div>
-          <div class="data-list">${lotsHtml}</div>
-        </div>`;
-    }).join('');
-
-    list.querySelectorAll('[data-act]').forEach(el => {
-      el.addEventListener('click', () => {
-        const act = el.dataset.act, id = el.dataset.id, date = el.dataset.date;
-        if (act === 'buy') this.openBuyModal(id);
-        else if (act === 'value') this.openValueModal(id);
-        else if (act === 'editlot') this.openBuyModal(id, this.assetById(id).lots.find(l => l.date === date));
-        else if (act === 'dellot') {
-          if (!confirm('¿Eliminar esta compra?')) return;
-          this.assetById(id).lots = this.assetById(id).lots.filter(l => l.date !== date);
-          this.save();
-          if (FirebaseSync.isLoggedIn()) FirebaseSync.saveToCloud();
-          this.render();
-        }
-      });
-    });
-  },
-
-  _buy: null,
-  _valueAsset: null,
-  openBuyModal(assetId, existingLot) {
-    this._buy = existingLot ? { assetId, date: existingLot.date } : null;
-    const a = this.assetById(assetId);
-    document.getElementById('buy-asset').value = a.name;
-    document.getElementById('buy-title').textContent = existingLot ? '✏️ Editar compra' : '💸 Registrar compra';
-    document.getElementById('buy-date').value = existingLot ? existingLot.date : new Date().toISOString().split('T')[0];
-    document.getElementById('buy-amount').value = existingLot ? existingLot.cost : '';
-    document.getElementById('buy-note').value = existingLot ? (existingLot.note || '') : '';
-    this.open('modal-buy');
-  },
-  saveBuy() {
-    const assetId = this._buy ? this._buy.assetId : null;
-    const a = this.assetById(assetId);
-    if (!a) return;
-    const date = document.getElementById('buy-date').value;
-    const cost = +document.getElementById('buy-amount').value;
-    const note = document.getElementById('buy-note').value.trim();
-    if (!date || !(cost >= 0)) return;
-    if (this._buy && this._buy.date) {
-      const idx = a.lots.findIndex(l => l.date === this._buy.date);
-      if (idx >= 0) a.lots[idx] = { date, cost, note };
-    } else {
-      const idx = a.lots.findIndex(l => l.date === date);
-      if (idx >= 0) a.lots[idx] = { date, cost, note };
-      else a.lots.push({ date, cost, note });
-    }
-    this._buy = null;
-    this.save();
-    if (FirebaseSync.isLoggedIn()) FirebaseSync.saveToCloud();
-    this.render();
-    this.close('modal-buy');
-    document.getElementById('buy-amount').value = '';
-    document.getElementById('buy-note').value = '';
-  },
-  openValueModal(assetId) {
-    this._valueAsset = assetId;
-    const a = this.assetById(assetId);
-    document.getElementById('value-asset').value = a.name;
-    document.getElementById('value-input').value = a.current !== null && a.current !== undefined ? a.current : '';
-    this.open('modal-value');
-  },
-  saveValue() {
-    const a = this.assetById(this._valueAsset);
-    if (!a) return;
-    const v = +document.getElementById('value-input').value;
-    if (!(v >= 0)) return;
-    a.current = v;
-    this._valueAsset = null;
-    this.save();
-    if (FirebaseSync.isLoggedIn()) FirebaseSync.saveToCloud();
-    this.render();
-    this.close('modal-value');
-    document.getElementById('value-input').value = '';
   },
 
   open(id) { document.getElementById(id).classList.remove('hidden'); },
