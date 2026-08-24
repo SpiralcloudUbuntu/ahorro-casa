@@ -1,15 +1,10 @@
-// Ahorro Casa PWA — v3
+// Ahorro Casa PWA — v4 (rediseño: Situación + Ahorro + Cartera + Deudas)
 const App = {
-  settings: {
-    housePrice: 400000, entryPct: 10, taxesPct: 10, houseInc: 5,
-    soloMonthly: 450, bothMonthly: 1500,
-    spy: 316, msci: 58, gold: 51, cash: 1410, spyMonthly: 50,
-    loan1: 5544, loan2: 15924, loanMonthly: 279
-  },
+  houseParams: { entryPct: 10, taxesPct: 10, houseInc: 5 },
   savings: [],
   housePrices: [],
   portfolio: [],
-  scenario: 'solo',
+  debts: [],
 
   init() {
     this.load();
@@ -17,41 +12,46 @@ const App = {
     this.bindEvents();
     this.setDefaultDates();
     this.render();
-    this.pinNav();
-  },
-  pinNav() {
-    const nav = document.querySelector('.bottom-nav');
-    if (!nav) return;
-    nav.style.position = 'fixed';
-    nav.style.bottom = '0';
-    nav.style.left = '0';
-    nav.style.right = '0';
-    nav.style.width = '100%';
-    nav.style.display = 'flex';
-    nav.style.zIndex = '999999';
-    nav.style.background = '#0a0a1a';
-    nav.style.transform = 'none';
   },
 
   load() {
     try {
-      const s = localStorage.getItem('ahc-settings');
-      if (s) Object.assign(this.settings, JSON.parse(s));
+      const hp = localStorage.getItem('ahc-hparams');
+      if (hp) Object.assign(this.houseParams, JSON.parse(hp));
       const sv = localStorage.getItem('ahc-savings');
       if (sv) this.savings = JSON.parse(sv);
-      const hp = localStorage.getItem('ahc-house');
-      if (hp) this.housePrices = JSON.parse(hp);
+      const hs = localStorage.getItem('ahc-house');
+      if (hs) this.housePrices = JSON.parse(hs);
       const pf = localStorage.getItem('ahc-portfolio');
       if (pf) this.portfolio = JSON.parse(pf);
       if (!Array.isArray(this.portfolio) || this.portfolio.length === 0) this.seedPortfolio();
-    } catch(e) {}
+      const db = localStorage.getItem('ahc-debts');
+      if (db) this.debts = JSON.parse(db);
+      if (!Array.isArray(this.debts) || this.debts.length === 0) this.seedDebts();
+    } catch (e) {}
   },
 
   save() {
-    localStorage.setItem('ahc-settings', JSON.stringify(this.settings));
+    localStorage.setItem('ahc-hparams', JSON.stringify(this.houseParams));
     localStorage.setItem('ahc-savings', JSON.stringify(this.savings));
     localStorage.setItem('ahc-house', JSON.stringify(this.housePrices));
     localStorage.setItem('ahc-portfolio', JSON.stringify(this.portfolio));
+    localStorage.setItem('ahc-debts', JSON.stringify(this.debts));
+  },
+
+  seedPortfolio() {
+    this.portfolio = [
+      { id: 'spy', name: 'S&P 500', lots: [], current: null, history: [] },
+      { id: 'msci', name: 'MSCI World', lots: [], current: null, history: [] },
+      { id: 'gold', name: 'Oro', lots: [], current: null, history: [] }
+    ];
+  },
+
+  seedDebts() {
+    this.debts = [
+      { id: 'l1', name: 'Préstamo *8602', pending: 5544, monthly: 69 },
+      { id: 'l2', name: 'Préstamo *7491', pending: 15924, monthly: 210 }
+    ];
   },
 
   setDefaultDates() {
@@ -60,217 +60,154 @@ const App = {
     document.getElementById('house-date').value = today;
   },
 
-  // --- Calculations ---
-  get totalSaved() {
-    return this.settings.spy + this.settings.msci + this.settings.gold + this.settings.cash;
+  // ---- Cálculos ----
+  get ahorroCash() {
+    return this.savings.length > 0 ? this.savings[this.savings.length - 1].amount : 0;
   },
-
-  get totalDebt() {
-    return this.settings.loan1 + this.settings.loan2;
+  costBasis(a) { return a.lots.reduce((s, l) => s + l.cost, 0); },
+  assetValue(a) { return a.current !== null && a.current !== undefined ? a.current : this.costBasis(a); },
+  get portfolioValue() { return this.portfolio.reduce((s, a) => s + this.assetValue(a), 0); },
+  get totalSaved() { return this.ahorroCash + this.portfolioValue; },
+  get totalDebt() { return this.debts.reduce((s, d) => s + d.pending, 0); },
+  get netWorth() { return this.totalSaved - this.totalDebt; },
+  get houseNow() {
+    return this.housePrices.length > 0 ? this.housePrices[this.housePrices.length - 1].price : 400000;
   },
-
-  get netWorth() {
-    return this.totalSaved - this.totalDebt;
-  },
-
   get targetToday() {
-    const h = this.settings.housePrice;
-    return h * (this.settings.entryPct / 100) + h * (this.settings.taxesPct / 100);
+    const ratio = (this.houseParams.entryPct + this.houseParams.taxesPct) / 100;
+    return this.houseNow * ratio;
   },
 
-  get monthly() {
-    return this.scenario === 'solo' ? this.settings.soloMonthly : this.settings.bothMonthly;
-  },
-
-  calcMonths() {
-    const m = this.monthly + this.settings.spyMonthly;
-    if (m <= 0) return Infinity;
-    let acc = this.totalSaved;
-    let mo = 0;
-    while (mo < 360) {
-      mo++;
-      acc += m;
-      const tgt = this.targetToday * Math.pow(1 + this.settings.houseInc / 100, mo / 12);
-      if (acc >= tgt) return mo;
-    }
-    return 360;
-  },
-
-  // Better savings rate using linear regression
   calcSavingsRate() {
     if (this.savings.length < 2) return null;
     const sorted = [...this.savings].sort((a, b) => a.date.localeCompare(b.date));
-    
-    // Linear regression: y = mx + b
     const n = sorted.length;
-    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
-    const baseDate = new Date(sorted[0].date).getTime();
-    
+    let sx = 0, sy = 0, sxy = 0, sx2 = 0;
+    const base = new Date(sorted[0].date).getTime();
     sorted.forEach(s => {
-      const x = (new Date(s.date).getTime() - baseDate) / (1000 * 60 * 60 * 24); // days
+      const x = (new Date(s.date).getTime() - base) / 86400000;
       const y = s.amount;
-      sumX += x;
-      sumY += y;
-      sumXY += x * y;
-      sumX2 += x * x;
+      sx += x; sy += y; sxy += x * y; sx2 += x * x;
     });
-    
-    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    const slope = (n * sxy - sx * sy) / (n * sx2 - sx * sx);
     const daily = slope;
-    const monthly = daily * 30;
-    const totalDays = (new Date(sorted[n-1].date).getTime() - baseDate) / (1000 * 60 * 60 * 24);
-    
-    return { daily, monthly, days: totalDays, entries: n };
+    return { daily, monthly: daily * 30 };
   },
 
   calcHouseRate() {
     if (this.housePrices.length < 2) return null;
     const sorted = [...this.housePrices].sort((a, b) => a.date.localeCompare(b.date));
     const n = sorted.length;
-    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
-    const baseDate = new Date(sorted[0].date).getTime();
-    
+    let sx = 0, sy = 0, sxy = 0, sx2 = 0;
+    const base = new Date(sorted[0].date).getTime();
     sorted.forEach(h => {
-      const x = (new Date(h.date).getTime() - baseDate) / (1000 * 60 * 60 * 24);
+      const x = (new Date(h.date).getTime() - base) / 86400000;
       const y = h.price;
-      sumX += x;
-      sumY += y;
-      sumXY += x * y;
-      sumX2 += x * x;
+      sx += x; sy += y; sxy += x * y; sx2 += x * x;
     });
-    
-    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    const slope = (n * sxy - sx * sy) / (n * sx2 - sx * sx);
     return { daily: slope, monthly: slope * 30 };
   },
 
-  calcRealCountdown() {
+  calcMonths() {
     const sr = this.calcSavingsRate();
-    const hr = this.calcHouseRate();
-    if (!sr || sr.monthly <= 0) return null;
-
-    const currentSaved = this.savings.length > 0 ? this.savings[this.savings.length - 1].amount : this.totalSaved;
-    const currentHouse = this.housePrices.length > 0 ? this.housePrices[this.housePrices.length - 1].price : this.settings.housePrice;
-    const entryPct = (this.settings.entryPct + this.settings.taxesPct) / 100;
-
-    let months = 0;
-    let saved = currentSaved;
-    let housePrice = currentHouse;
-
-    while (months < 360) {
-      months++;
+    if (!sr || sr.monthly <= 0) return Infinity;
+    const ratio = (this.houseParams.entryPct + this.houseParams.taxesPct) / 100;
+    let saved = this.totalSaved;
+    let mo = 0;
+    while (mo < 360) {
+      mo++;
       saved += sr.monthly;
-      if (hr) housePrice += hr.monthly;
-      if (saved >= housePrice * entryPct) return months;
+      const tgt = this.houseNow * Math.pow(1 + this.houseParams.houseInc / 100, mo / 12) * ratio;
+      if (saved >= tgt) return mo;
     }
-    return null;
+    return 360;
   },
 
-  // Milestones
-  getMilestone() {
-    const pct = (this.totalSaved / this.targetToday) * 100;
-    if (pct >= 100) return { emoji: '🎉', text: '¡Objetivo alcanzado!' };
-    if (pct >= 75) return { emoji: '🔥', text: '¡Estás muy cerca!' };
-    if (pct >= 50) return { emoji: '💪', text: '¡Mitad del camino!' };
-    if (pct >= 25) return { emoji: '🚀', text: '¡Buen progreso!' };
-    return null;
-  },
-
-  // --- Render ---
+  // ---- Render ----
   render() {
     this.renderSituacion();
-    this.renderCalculadora();
+    this.renderAhorro();
     this.renderCartera();
+    this.renderDeudas();
   },
 
   renderSituacion() {
     const months = this.calcMonths();
-    const pct = Math.min(100, (this.totalSaved / this.targetToday) * 100);
-    const houseThen = months < 360 ? this.settings.housePrice * Math.pow(1 + this.settings.houseInc / 100, months / 12) : this.settings.housePrice;
-    const targetThen = houseThen * ((this.settings.entryPct + this.settings.taxesPct) / 100);
+    const saved = this.totalSaved;
+    const tgt = this.targetToday;
+    const pct = Math.min(100, tgt > 0 ? (saved / tgt) * 100 : 0);
 
-    // Ring
     const ring = document.getElementById('progress-ring');
     const c = 2 * Math.PI * 85;
     ring.style.strokeDasharray = c;
     ring.style.strokeDashoffset = c - (pct / 100) * c;
     ring.style.stroke = pct >= 80 ? '#00b894' : pct >= 50 ? '#fdcb6e' : '#6c5ce7';
-
     document.getElementById('progress-pct').textContent = Math.round(pct) + '%';
-    document.getElementById('saved-amount').textContent = this.n(this.totalSaved);
-    document.getElementById('target-amount').textContent = this.n(this.targetToday);
+    document.getElementById('saved-amount').textContent = this.n(saved);
+    document.getElementById('target-amount').textContent = this.n(tgt);
 
-    // Milestone
-    const milestone = this.getMilestone();
-    const milestoneEl = document.getElementById('milestone');
-    if (milestone && pct < 100) {
-      milestoneEl.textContent = `${milestone.emoji} ${milestone.text}`;
-      milestoneEl.classList.remove('hidden');
-    } else {
-      milestoneEl.classList.add('hidden');
-    }
+    const milestone = pct >= 100 ? { emoji: '🎉', text: '¡Objetivo alcanzado!' } : pct >= 75 ? { emoji: '🔥', text: '¡Estás muy cerca!' } : pct >= 50 ? { emoji: '💪', text: '¡Mitad del camino!' } : pct >= 25 ? { emoji: '🚀', text: '¡Buen progreso!' } : null;
+    const msEl = document.getElementById('milestone');
+    if (milestone && pct < 100) { msEl.textContent = `${milestone.emoji} ${milestone.text}`; msEl.classList.remove('hidden'); }
+    else msEl.classList.add('hidden');
 
-    // Countdown
-    if (months <= 0) {
-      document.getElementById('countdown').textContent = '¡Ya puedes!';
-      document.getElementById('countdown-date').textContent = '';
-    } else if (months >= 360) {
-      document.getElementById('countdown').textContent = '+30 años';
-      document.getElementById('countdown-date').textContent = 'Necesitas ahorrar más';
-    } else {
+    const cdEl = document.getElementById('countdown');
+    if (!isFinite(months)) { cdEl.textContent = '+30 años'; document.getElementById('countdown-date').textContent = 'Registra 2+ ahorros'; }
+    else if (months <= 0) { cdEl.textContent = '¡Ya puedes!'; document.getElementById('countdown-date').textContent = ''; }
+    else if (months >= 360) { cdEl.textContent = '+30 años'; document.getElementById('countdown-date').textContent = 'Necesitas ahorrar más'; }
+    else {
       const y = Math.floor(months / 12), m = Math.round(months % 12);
-      document.getElementById('countdown').textContent = y > 0 ? `${y}a ${m}m` : `${m} meses`;
+      cdEl.textContent = y > 0 ? `${y}a ${m}m` : `${m} meses`;
       const d = new Date(); d.setMonth(d.getMonth() + months);
       document.getElementById('countdown-date').textContent = d.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
     }
 
-    // Stats
-    document.getElementById('stat-monthly').textContent = this.n(this.monthly) + ' €';
-    document.getElementById('stat-house-now').textContent = this.n(this.settings.housePrice) + ' €';
-    document.getElementById('stat-house-then').textContent = this.n(Math.round(houseThen)) + ' €';
-    document.getElementById('stat-entry').textContent = this.n(Math.round(targetThen)) + ' €';
+    document.getElementById('stat-cash').textContent = this.n(this.ahorroCash) + ' €';
+    document.getElementById('stat-portfolio').textContent = this.n(this.portfolioValue) + ' €';
+    document.getElementById('stat-house-now').textContent = this.n(this.houseNow) + ' €';
+    document.getElementById('stat-entry').textContent = this.n(tgt) + ' €';
 
-    // Breakdown - Patrimonio
-    document.getElementById('bd-spy').textContent = this.n(this.settings.spy) + ' €';
-    document.getElementById('bd-msci').textContent = this.n(this.settings.msci) + ' €';
-    document.getElementById('bd-gold').textContent = this.n(this.settings.gold) + ' €';
-    document.getElementById('bd-cash').textContent = this.n(this.settings.cash) + ' €';
-    document.getElementById('bd-total').textContent = this.n(this.totalSaved) + ' €';
+    // Patrimonio breakdown
+    let assets = `<div class="breakdown-item"><span class="breakdown-dot" style="background:#9b59b6"></span><span class="breakdown-label">Efectivo</span><span class="breakdown-value">${this.n(this.ahorroCash)} €</span></div>`;
+    assets += this.portfolio.map(a => `<div class="breakdown-item"><span class="breakdown-dot" style="background:${this.pfColor(a.id)}"></span><span class="breakdown-label">${a.name}</span><span class="breakdown-value">${this.n(this.assetValue(a))} €</span></div>`).join('');
+    assets += `<div class="breakdown-item total"><span class="breakdown-dot" style="background:transparent"></span><span class="breakdown-label">Total</span><span class="breakdown-value">${this.n(this.totalSaved)} €</span></div>`;
+    document.getElementById('bd-assets').innerHTML = assets;
 
-    // Breakdown - Préstamos
-    document.getElementById('bd-loan1').textContent = this.n(this.settings.loan1) + ' €';
-    document.getElementById('bd-loan2').textContent = this.n(this.settings.loan2) + ' €';
-    document.getElementById('bd-loan-m').textContent = this.n(this.settings.loanMonthly) + ' €/mes';
+    // Deudas breakdown
+    let debts = this.debts.map(d => `<div class="breakdown-item"><span class="breakdown-dot" style="background:#e74c3c"></span><span class="breakdown-label">${d.name}</span><span class="breakdown-value">${this.n(d.pending)} €</span></div>`).join('');
+    const tMonthly = this.debts.reduce((s, d) => s + d.monthly, 0);
+    debts += `<div class="breakdown-item"><span class="breakdown-dot" style="background:#e74c3c"></span><span class="breakdown-label">Cuota mensual</span><span class="breakdown-value">${this.n(tMonthly)} €/mes</span></div>`;
+    document.getElementById('bd-debts').innerHTML = debts;
 
-    // Net worth
     const nw = this.netWorth;
-    document.getElementById('bd-net-worth').textContent = (nw >= 0 ? '' : '-') + this.n(Math.abs(nw)) + ' €';
-    document.getElementById('bd-net-worth').style.color = nw >= 0 ? '#00b894' : '#ff6b6b';
-
-    // Scenario buttons
-    document.querySelectorAll('.scenario-btn').forEach(b => b.classList.toggle('active', b.dataset.scenario === this.scenario));
+    const nwEl = document.getElementById('bd-net-worth');
+    nwEl.textContent = (nw >= 0 ? '' : '-') + this.n(Math.abs(nw)) + ' €';
+    nwEl.style.color = nw >= 0 ? '#00b894' : '#ff6b6b';
   },
 
-  renderCalculadora() {
+  renderAhorro() {
     const sr = this.calcSavingsRate();
     const hr = this.calcHouseRate();
-    const rc = this.calcRealCountdown();
+    const months = this.calcMonths();
 
-    document.getElementById('est-daily').textContent = sr ? this.n(sr.daily) + ' €/día' : '—';
-    document.getElementById('est-monthly').textContent = sr ? this.n(sr.monthly) + ' €/mes' : '—';
+    document.getElementById('est-daily').textContent = sr ? this.money(sr.daily) + ' €/día' : '—';
+    document.getElementById('est-monthly').textContent = sr ? this.money(sr.monthly) + ' €/mes' : '—';
     document.getElementById('est-house').textContent = hr ? (hr.monthly >= 0 ? '+' : '') + this.n(hr.monthly) + ' €/mes' : '—';
+    const est = document.getElementById('est-countdown');
+    if (!isFinite(months) || months >= 360) est.textContent = 'Necesitas 2+ datos';
+    else if (months <= 0) est.textContent = '¡Ya puedes!';
+    else est.textContent = `${Math.floor(months / 12)} años y ${Math.round(months % 12)} meses`;
 
-    if (rc !== null) {
-      const y = Math.floor(rc / 12), m = Math.round(rc % 12);
-      document.getElementById('est-countdown').textContent = y > 0 ? `${y} años y ${m} meses` : `${m} meses`;
-    } else {
-      document.getElementById('est-countdown').textContent = sr ? 'Ahorro insuficiente' : 'Introduce 2+ datos';
-    }
+    // House params
+    document.getElementById('set-entry-pct').value = this.houseParams.entryPct;
+    document.getElementById('set-taxes-pct').value = this.houseParams.taxesPct;
+    document.getElementById('set-house-inc').value = this.houseParams.houseInc;
 
     // Savings list
     const sl = document.getElementById('savings-list');
-    if (this.savings.length === 0) {
-      sl.innerHTML = '<p class="data-empty">Sin datos. Pulsa "+ Añadir" para registrar tu ahorro actual.</p>';
-    } else {
+    if (this.savings.length === 0) sl.innerHTML = '<p class="data-empty">Sin datos. Pulsa "+ Añadir" para registrar tu ahorro.</p>';
+    else {
       const sorted = [...this.savings].sort((a, b) => b.date.localeCompare(a.date));
       sl.innerHTML = sorted.map(s => `
         <div class="data-item">
@@ -279,19 +216,17 @@ const App = {
             ${s.note ? `<div class="data-note">${s.note}</div>` : ''}
           </div>
           <div class="data-right">
-            <span class="data-value">${this.n(s.amount)} €</span>
+            <span class="data-value">${this.money(s.amount)} €</span>
             <button class="data-edit" data-type="saving" data-date="${s.date}" title="Editar">✏️</button>
             <button class="data-delete" data-type="saving" data-date="${s.date}" title="Eliminar">✕</button>
           </div>
-        </div>
-      `).join('');
+        </div>`).join('');
     }
 
-    // House price list
+    // House list
     const hl = document.getElementById('house-list');
-    if (this.housePrices.length === 0) {
-      hl.innerHTML = '<p class="data-empty">Sin datos. Pulsa "+ Añadir" cuando busques o actualices precio.</p>';
-    } else {
+    if (this.housePrices.length === 0) hl.innerHTML = '<p class="data-empty">Sin datos. Pulsa "+ Precio" para registrar.</p>';
+    else {
       const sorted = [...this.housePrices].sort((a, b) => b.date.localeCompare(a.date));
       hl.innerHTML = sorted.map(h => `
         <div class="data-item">
@@ -304,280 +239,18 @@ const App = {
             <button class="data-edit" data-type="house" data-date="${h.date}" title="Editar">✏️</button>
             <button class="data-delete" data-type="house" data-date="${h.date}" title="Eliminar">✕</button>
           </div>
-        </div>
-      `).join('');
+        </div>`).join('');
     }
 
-    // Chart
-    this.renderChart();
-
-    // Edit buttons
-    document.querySelectorAll('.data-edit').forEach(btn => {
-      btn.addEventListener('click', () => this.editEntry(btn.dataset.type, btn.dataset.date));
-    });
-
-    // Delete buttons
-    document.querySelectorAll('.data-delete').forEach(btn => {
-      btn.addEventListener('click', () => {
-        if (!confirm('¿Eliminar esta entrada?')) return;
-        const type = btn.dataset.type;
-        const date = btn.dataset.date;
-        if (type === 'saving') this.savings = this.savings.filter(s => s.date !== date);
-        else this.housePrices = this.housePrices.filter(h => h.date !== date);
-        this.save();
-        if (FirebaseSync.isLoggedIn()) FirebaseSync.saveToCloud();
-        this.render();
-      });
-    });
+    sl.querySelectorAll('.data-edit').forEach(b => b.addEventListener('click', () => this.editEntry('saving', b.dataset.date)));
+    sl.querySelectorAll('.data-delete').forEach(b => b.addEventListener('click', () => this.delEntry('saving', b.dataset.date)));
+    hl.querySelectorAll('.data-edit').forEach(b => b.addEventListener('click', () => this.editEntry('house', b.dataset.date)));
+    hl.querySelectorAll('.data-delete').forEach(b => b.addEventListener('click', () => this.delEntry('house', b.dataset.date)));
   },
-
-  renderChart() {
-    const canvas = document.getElementById('chart-canvas');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const w = canvas.width = canvas.parentElement.offsetWidth - 40;
-    const h = canvas.height = 160;
-    ctx.clearRect(0, 0, w, h);
-
-    if (this.savings.length < 2) {
-      ctx.fillStyle = 'rgba(255,255,255,0.3)';
-      ctx.font = '12px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('Introduce 2+ datos para ver el gráfico', w/2, h/2);
-      return;
-    }
-
-    const sorted = [...this.savings].sort((a, b) => a.date.localeCompare(b.date));
-    const values = sorted.map(s => s.amount);
-    const minV = Math.min(...values) * 0.9;
-    const maxV = Math.max(...values) * 1.1;
-    const range = maxV - minV || 1;
-
-    const padX = 40, padY = 20;
-    const chartW = w - padX * 2;
-    const chartH = h - padY * 2;
-
-    // Grid lines
-    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= 4; i++) {
-      const y = padY + (chartH / 4) * i;
-      ctx.beginPath();
-      ctx.moveTo(padX, y);
-      ctx.lineTo(w - padX, y);
-      ctx.stroke();
-    }
-
-    // Line
-    ctx.strokeStyle = '#6c5ce7';
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    sorted.forEach((s, i) => {
-      const x = padX + (i / (sorted.length - 1)) * chartW;
-      const y = padY + chartH - ((s.amount - minV) / range) * chartH;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    });
-    ctx.stroke();
-
-    // Dots
-    sorted.forEach((s, i) => {
-      const x = padX + (i / (sorted.length - 1)) * chartW;
-      const y = padY + chartH - ((s.amount - minV) / range) * chartH;
-      ctx.fillStyle = '#6c5ce7';
-      ctx.beginPath();
-      ctx.arc(x, y, 4, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    // Labels
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.font = '10px sans-serif';
-    ctx.textAlign = 'right';
-    ctx.fillText(this.n(maxV) + '€', padX - 4, padY + 4);
-    ctx.fillText(this.n(minV) + '€', padX - 4, padY + chartH + 4);
-  },
-
-  // --- Events ---
-  bindEvents() {
-    // Login
-    document.getElementById('btn-login').addEventListener('click', () => this.open('modal-login'));
-    document.getElementById('login-close').addEventListener('click', () => this.close('modal-login'));
-    document.getElementById('modal-login').addEventListener('click', e => { if (e.target.id === 'modal-login') this.close('modal-login'); });
-    document.getElementById('btn-google-login').addEventListener('click', async () => {
-      try { await FirebaseSync.signInGoogle(); this.close('modal-login'); } catch (e) { alert('Error: ' + e.message); }
-    });
-    document.getElementById('form-email-login').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      try { await FirebaseSync.signInEmail(document.getElementById('login-email').value, document.getElementById('login-password').value); this.close('modal-login'); } catch (err) { alert('Error: ' + err.message); }
-    });
-    document.getElementById('btn-logout').addEventListener('click', async () => {
-      if (confirm('¿Cerrar sesión? Tus datos siguen en este dispositivo.')) await FirebaseSync.signOut();
-    });
-
-    // Bottom nav
-    document.querySelectorAll('.nav-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
-        document.getElementById('tab-' + btn.dataset.tab).classList.remove('hidden');
-        if (btn.dataset.tab === 'calculadora') this.renderChart();
-        if (btn.dataset.tab === 'cartera') this.renderCartera();
-      });
-    });
-
-    // Scenario
-    document.querySelectorAll('.scenario-btn').forEach(btn => {
-      btn.addEventListener('click', () => { this.scenario = btn.dataset.scenario; this.render(); });
-    });
-
-    // Settings
-    document.getElementById('btn-settings').addEventListener('click', () => this.openSettings());
-    document.getElementById('settings-close').addEventListener('click', () => this.close('modal-settings'));
-    document.getElementById('btn-save-settings').addEventListener('click', () => this.saveSettings());
-    document.getElementById('btn-reset').addEventListener('click', () => { if (confirm('¿Reset? Se borrarán todos los datos.')) { localStorage.clear(); location.reload(); } });
-
-    // Add saving
-    document.getElementById('btn-add-saving').addEventListener('click', () => this.openEntryModal('saving'));
-    document.getElementById('saving-close').addEventListener('click', () => this.close('modal-saving'));
-    document.getElementById('btn-do-save').addEventListener('click', () => this.saveEntry('saving'));
-
-    // Add house
-    document.getElementById('btn-add-house').addEventListener('click', () => this.openEntryModal('house'));
-    document.getElementById('house-close').addEventListener('click', () => this.close('modal-house'));
-    document.getElementById('btn-do-house').addEventListener('click', () => this.saveEntry('house'));
-
-    // Portfolio (Cartera)
-    document.getElementById('buy-close').addEventListener('click', () => this.close('modal-buy'));
-    document.getElementById('value-close').addEventListener('click', () => this.close('modal-value'));
-    document.getElementById('btn-do-buy').addEventListener('click', () => this.saveBuy());
-    document.getElementById('btn-do-value').addEventListener('click', () => this.saveValue());
-
-    // Close on backdrop
-    ['modal-settings', 'modal-saving', 'modal-house', 'modal-buy', 'modal-value', 'modal-login'].forEach(id => {
-      document.getElementById(id).addEventListener('click', e => { if (e.target === document.getElementById(id)) this.close(id); });
-    });
-  },
-
-  openSettings() {
-    const s = this.settings;
-    const map = {
-      'set-house-price': 'housePrice', 'set-entry-pct': 'entryPct', 'set-taxes-pct': 'taxesPct',
-      'set-house-inc': 'houseInc', 'set-solo-m': 'soloMonthly', 'set-both-m': 'bothMonthly',
-      'set-spy': 'spy', 'set-msci': 'msci', 'set-gold': 'gold', 'set-cash': 'cash',
-      'set-spy-m': 'spyMonthly', 'set-l1': 'loan1', 'set-l2': 'loan2', 'set-lm': 'loanMonthly'
-    };
-    for (const [id, key] of Object.entries(map)) {
-      document.getElementById(id).value = s[key];
-    }
-    this.open('modal-settings');
-  },
-
-  saveSettings() {
-    const map = {
-      'set-house-price': 'housePrice', 'set-entry-pct': 'entryPct', 'set-taxes-pct': 'taxesPct',
-      'set-house-inc': 'houseInc', 'set-solo-m': 'soloMonthly', 'set-both-m': 'bothMonthly',
-      'set-spy': 'spy', 'set-msci': 'msci', 'set-gold': 'gold', 'set-cash': 'cash',
-      'set-spy-m': 'spyMonthly', 'set-l1': 'loan1', 'set-l2': 'loan2', 'set-lm': 'loanMonthly'
-    };
-    for (const [id, key] of Object.entries(map)) {
-      this.settings[key] = +document.getElementById(id).value;
-    }
-    this.save();
-    if (FirebaseSync.isLoggedIn()) FirebaseSync.saveToCloud();
-    this.render();
-    this.close('modal-settings');
-  },
-
-  // Unified entry modal (add + edit)
-  _editing: null, // { type: 'saving'|'house', date: '...' }
-
-  openEntryModal(type, existingData) {
-    this._editing = existingData ? { type, date: existingData.date } : null;
-    const modalId = type === 'saving' ? 'modal-saving' : 'modal-house';
-    const dateEl = document.getElementById(type === 'saving' ? 'save-date' : 'house-date');
-    const amountEl = document.getElementById(type === 'saving' ? 'save-amount' : 'house-amount');
-    const noteEl = document.getElementById(type === 'saving' ? 'save-note' : 'house-note');
-    const titleEl = document.querySelector(`#${modalId} .modal-header h2`);
-
-    if (existingData) {
-      dateEl.value = existingData.date;
-      amountEl.value = existingData.amount || existingData.price;
-      noteEl.value = existingData.note || '';
-      titleEl.textContent = type === 'saving' ? '✏️ Editar ahorro' : '✏️ Editar precio';
-    } else {
-      dateEl.value = new Date().toISOString().split('T')[0];
-      amountEl.value = '';
-      noteEl.value = '';
-      titleEl.textContent = type === 'saving' ? '💰 Registrar ahorro' : '🏠 Registrar precio';
-    }
-    this.open(modalId);
-  },
-
-  saveEntry(type) {
-    const dateEl = document.getElementById(type === 'saving' ? 'save-date' : 'house-date');
-    const amountEl = document.getElementById(type === 'saving' ? 'save-amount' : 'house-amount');
-    const noteEl = document.getElementById(type === 'saving' ? 'save-note' : 'house-note');
-
-    const date = dateEl.value;
-    const amount = +amountEl.value;
-    const note = noteEl.value.trim();
-    if (!date || !amount) return;
-
-    if (type === 'saving') {
-      if (this._editing && this._editing.type === 'saving') {
-        // Edit existing
-        const idx = this.savings.findIndex(s => s.date === this._editing.date);
-        if (idx >= 0) this.savings[idx] = { date, amount, note };
-      } else {
-        const idx = this.savings.findIndex(s => s.date === date);
-        if (idx >= 0) this.savings[idx] = { date, amount, note };
-        else this.savings.push({ date, amount, note });
-      }
-    } else {
-      if (this._editing && this._editing.type === 'house') {
-        const idx = this.housePrices.findIndex(h => h.date === this._editing.date);
-        if (idx >= 0) this.housePrices[idx] = { date, price: amount, note };
-      } else {
-        const idx = this.housePrices.findIndex(h => h.date === date);
-        if (idx >= 0) this.housePrices[idx] = { date, price: amount, note };
-        else this.housePrices.push({ date, price: amount, note });
-      }
-      this.settings.housePrice = amount;
-    }
-
-    this._editing = null;
-    this.save();
-    if (FirebaseSync.isLoggedIn()) FirebaseSync.saveToCloud();
-    this.render();
-    this.close(type === 'saving' ? 'modal-saving' : 'modal-house');
-    amountEl.value = '';
-    noteEl.value = '';
-  },
-
-  editEntry(type, date) {
-    const arr = type === 'saving' ? this.savings : this.housePrices;
-    const entry = arr.find(e => e.date === date);
-    if (entry) this.openEntryModal(type, entry);
-  },
-
-  // --- Portfolio / Cartera ---
-  money(v) { return (v ?? 0).toLocaleString('es-ES', { maximumFractionDigits: 2 }); },
-  seedPortfolio() {
-    this.portfolio = [
-      { id: 'spy', name: 'S&P 500', lots: [], current: null },
-      { id: 'msci', name: 'MSCI World', lots: [], current: null },
-      { id: 'gold', name: 'Oro', lots: [], current: null }
-    ];
-  },
-  assetById(id) { return this.portfolio.find(a => a.id === id); },
-  costBasis(a) { return a.lots.reduce((s, l) => s + l.cost, 0); },
-  assetValue(a) { return a.current !== null && a.current !== undefined ? a.current : this.costBasis(a); },
 
   renderCartera() {
     const totalCost = this.portfolio.reduce((s, a) => s + this.costBasis(a), 0);
-    const totalVal = this.portfolio.reduce((s, a) => s + this.assetValue(a), 0);
+    const totalVal = this.portfolioValue;
     const pnl = totalVal - totalCost;
     const pct = totalCost > 0 ? (pnl / totalCost) * 100 : 0;
     const color = pnl > 0 ? '#00b894' : pnl < 0 ? '#ff6b6b' : '#e8e8f0';
@@ -598,8 +271,6 @@ const App = {
       const apnl = val - cb;
       const apct = cb > 0 ? (apnl / cb) * 100 : 0;
       const acolor = apnl > 0 ? '#00b894' : apnl < 0 ? '#ff6b6b' : 'var(--text-dim)';
-      const dot = a.id === 'spy' ? '#3498db' : a.id === 'msci' ? '#2ecc71' : '#f39c12';
-      const dot2 = a.id === 'spy' ? '#74b9ff' : a.id === 'msci' ? '#55efc4' : '#ffeaa7';
       const set = a.current !== null && a.current !== undefined;
       const lotsHtml = a.lots.length === 0
         ? '<p class="data-empty">Sin compras aún.</p>'
@@ -622,9 +293,12 @@ const App = {
             <button class="btn-small" data-act="buy" data-id="${a.id}" title="Registrar compra">＋ Compra</button>
           </div>
           <div class="breakdown-list" style="margin-bottom:10px">
-            <div class="breakdown-item"><span class="breakdown-dot" style="background:${dot}"></span><span class="breakdown-label">Coste</span><span class="breakdown-value">${this.money(cb)} €</span></div>
-            <div class="breakdown-item"><span class="breakdown-dot" style="background:${dot2}"></span><span class="breakdown-label">Valor actual</span><span class="breakdown-value">${set ? this.money(val) + ' €' : '—'}</span></div>
+            <div class="breakdown-item"><span class="breakdown-dot" style="background:${this.pfColor(a.id)}"></span><span class="breakdown-label">Coste</span><span class="breakdown-value">${this.money(cb)} €</span></div>
+            <div class="breakdown-item"><span class="breakdown-dot" style="background:${this.pfColor2(a.id)}"></span><span class="breakdown-label">Valor actual</span><span class="breakdown-value">${set ? this.money(val) + ' €' : '—'}</span></div>
             <div class="breakdown-item"><span class="breakdown-dot" style="background:transparent"></span><span class="breakdown-label">P/L</span><span class="breakdown-value" style="color:${acolor}">${apnl >= 0 ? '+' : '−'}${this.money(Math.abs(apnl))} € (${cb > 0 ? (apnl >= 0 ? '+' : '−') + this.money(Math.abs(apct)) + '%' : '—'})</span></div>
+          </div>
+          <div class="chart-container">
+            <canvas id="chart-${a.id}"></canvas>
           </div>
           <div class="calc-header" style="border-top:1px solid var(--card-border); padding-top:10px">
             <span style="font-size:12px;color:var(--text-dim)">Compras</span>
@@ -643,13 +317,149 @@ const App = {
         else if (act === 'dellot') {
           if (!confirm('¿Eliminar esta compra?')) return;
           this.assetById(id).lots = this.assetById(id).lots.filter(l => l.date !== date);
-          this.save();
-          if (FirebaseSync.isLoggedIn()) FirebaseSync.saveToCloud();
+          this.save(); if (FirebaseSync.isLoggedIn()) FirebaseSync.saveToCloud();
           this.render();
         }
       });
     });
+
+    this.portfolio.forEach(a => this.renderAssetChart(a));
   },
+
+  renderAssetChart(a) {
+    const canvas = document.getElementById('chart-' + a.id);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width = (canvas.parentElement.offsetWidth || 300) - 6;
+    const h = canvas.height = 140;
+    ctx.clearRect(0, 0, w, h);
+    if (a.history.length < 2) {
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.font = '11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Actualiza el valor al menos 2 días para ver la gráfica', w / 2, h / 2);
+      return;
+    }
+    const sorted = [...a.history].sort((x, y) => x.date.localeCompare(y.date));
+    const vp = sorted.map(p => p.value);
+    const cb = this.costBasis(a);
+    const gp = sorted.map(p => p.value - cb);
+    const all = [...vp, ...gp];
+    const minV = Math.min(...all, 0) * 1.05;
+    const maxV = Math.max(...all) * 1.05;
+    const range = maxV - minV || 1;
+    const padX = 8, padY = 12;
+    const cw = w - padX * 2, ch = h - padY * 2;
+    const X = i => padX + (i / (sorted.length - 1)) * cw;
+    const Y = v => padY + ch - ((v - minV) / range) * ch;
+
+    // grid
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+    ctx.lineWidth = 1;
+    for (let g = 0; g <= 3; g++) { const y = padY + (ch / 3) * g; ctx.beginPath(); ctx.moveTo(padX, y); ctx.lineTo(w - padX, y); ctx.stroke(); }
+
+    // gain line (dashed)
+    ctx.setLineDash([4, 3]);
+    ctx.strokeStyle = gp.some(v => v < 0) ? '#ff6b6b' : '#00b894';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    gp.forEach((v, i) => { i === 0 ? ctx.moveTo(X(i), Y(v)) : ctx.lineTo(X(i), Y(v)); });
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // value line (solid)
+    ctx.strokeStyle = '#6c5ce7';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    vp.forEach((v, i) => { i === 0 ? ctx.moveTo(X(i), Y(v)) : ctx.lineTo(X(i), Y(v)); });
+    ctx.stroke();
+
+    // points
+    vp.forEach((v, i) => { ctx.fillStyle = '#a29bfe'; ctx.beginPath(); ctx.arc(X(i), Y(v), 3, 0, Math.PI * 2); ctx.fill(); });
+
+    // legend
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#a29bfe'; ctx.fillRect(8, 2, 8, 8); ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillText('Valor', 20, 10);
+    ctx.fillStyle = gp.some(v => v < 0) ? '#ff6b6b' : '#00b894'; ctx.fillRect(58, 2, 8, 8); ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillText('Ganancia', 70, 10);
+  },
+
+  renderDeudas() {
+    const t = this.debts.reduce((s, d) => s + d.pending, 0);
+    const m = this.debts.reduce((s, d) => s + d.monthly, 0);
+    document.getElementById('dq-total').textContent = this.n(t) + ' €';
+    document.getElementById('dq-monthly').textContent = this.n(m) + ' €/mes';
+
+    const list = document.getElementById('debt-list');
+    list.innerHTML = this.debts.map(d => {
+      const months = d.monthly > 0 ? Math.ceil(d.pending / d.monthly) : 0;
+      return `
+        <div class="calc-section">
+          <div class="calc-header">
+            <h3>🏦 ${d.name}</h3>
+            <button class="btn-small" data-editdeb="${d.id}">✏️ Actualizar</button>
+          </div>
+          <div class="breakdown-list">
+            <div class="breakdown-item"><span class="breakdown-dot" style="background:#e74c3c"></span><span class="breakdown-label">Pendiente</span><span class="breakdown-value">${this.n(d.pending)} €</span></div>
+            <div class="breakdown-item"><span class="breakdown-dot" style="background:#ff7675"></span><span class="breakdown-label">Cuota / mes</span><span class="breakdown-value">${this.n(d.monthly)} €</span></div>
+            <div class="breakdown-item"><span class="breakdown-dot" style="background:transparent"></span><span class="breakdown-label">Pago en ~</span><span class="breakdown-value" style="color:${d.monthly>0?'#a29bfe':'var(--text-dim)'}">${months > 0 ? months + ' meses' : '—'}</span></div>
+          </div>
+        </div>`;
+    }).join('');
+    list.querySelectorAll('[data-editdeb]').forEach(b => b.addEventListener('click', () => this.openDebtModal(b.dataset.editdeb)));
+  },
+
+  pfColor(id) { return id === 'spy' ? '#3498db' : id === 'msci' ? '#2ecc71' : '#f39c12'; },
+  pfColor2(id) { return id === 'spy' ? '#74b9ff' : id === 'msci' ? '#55efc4' : '#ffeaa7'; },
+
+  // ---- Modals ----
+  openEntryModal(type, existing) {
+    this._edit = existing ? { type, date: existing.date } : null;
+    const id = type === 'saving' ? 'modal-saving' : 'modal-house';
+    const dateEl = document.getElementById(type === 'saving' ? 'save-date' : 'house-date');
+    const amt = document.getElementById(type === 'saving' ? 'save-amount' : 'house-amount');
+    const note = document.getElementById(type === 'saving' ? 'save-note' : 'house-note');
+    const title = document.querySelector(`#${id} .modal-header h2`);
+    if (existing) { dateEl.value = existing.date; amt.value = existing.amount || existing.price; note.value = existing.note || ''; title.textContent = '✏️ Editar'; }
+    else { dateEl.value = new Date().toISOString().split('T')[0]; amt.value = ''; note.value = ''; title.textContent = type === 'saving' ? '💰 Registrar ahorro' : '🏠 Registrar precio'; }
+    this.open(id);
+  },
+
+  saveEntry(type) {
+    const dateEl = document.getElementById(type === 'saving' ? 'save-date' : 'house-date');
+    const amtEl = document.getElementById(type === 'saving' ? 'save-amount' : 'house-amount');
+    const noteEl = document.getElementById(type === 'saving' ? 'save-note' : 'house-note');
+    const date = dateEl.value, amt = +amtEl.value, note = noteEl.value.trim();
+    if (!date || !(amt >= 0)) return;
+    if (type === 'saving') {
+      if (this._edit && this._edit.type === 'saving') { const i = this.savings.findIndex(s => s.date === this._edit.date); if (i >= 0) this.savings[i] = { date, amount: amt, note }; }
+      else { const i = this.savings.findIndex(s => s.date === date); if (i >= 0) this.savings[i] = { date, amount: amt, note }; else this.savings.push({ date, amount: amt, note }); }
+      this.close('modal-saving');
+    } else {
+      if (this._edit && this._edit.type === 'house') { const i = this.housePrices.findIndex(h => h.date === this._edit.date); if (i >= 0) this.housePrices[i] = { date, price: amt, note }; }
+      else { const i = this.housePrices.findIndex(h => h.date === date); if (i >= 0) this.housePrices[i] = { date, price: amt, note }; else this.housePrices.push({ date, price: amt, note }); }
+      this.close('modal-house');
+    }
+    this._edit = null;
+    this.save(); if (FirebaseSync.isLoggedIn()) FirebaseSync.saveToCloud();
+    this.render();
+  },
+
+  editEntry(type, date) {
+    const arr = type === 'saving' ? this.savings : this.housePrices;
+    const e = arr.find(x => x.date === date);
+    if (e) this.openEntryModal(type, e);
+  },
+
+  delEntry(type, date) {
+    if (!confirm('¿Eliminar esta entrada?')) return;
+    if (type === 'saving') this.savings = this.savings.filter(s => s.date !== date);
+    else this.housePrices = this.housePrices.filter(h => h.date !== date);
+    this.save(); if (FirebaseSync.isLoggedIn()) FirebaseSync.saveToCloud();
+    this.render();
+  },
+
+  assetById(id) { return this.portfolio.find(a => a.id === id); },
 
   _buy: null,
   _valueAsset: null,
@@ -671,21 +481,12 @@ const App = {
     const cost = +document.getElementById('buy-amount').value;
     const note = document.getElementById('buy-note').value.trim();
     if (!date || !(cost >= 0)) return;
-    if (this._buy && this._buy.date) {
-      const idx = a.lots.findIndex(l => l.date === this._buy.date);
-      if (idx >= 0) a.lots[idx] = { date, cost, note };
-    } else {
-      const idx = a.lots.findIndex(l => l.date === date);
-      if (idx >= 0) a.lots[idx] = { date, cost, note };
-      else a.lots.push({ date, cost, note });
-    }
+    if (this._buy && this._buy.date) { const i = a.lots.findIndex(l => l.date === this._buy.date); if (i >= 0) a.lots[i] = { date, cost, note }; }
+    else { const i = a.lots.findIndex(l => l.date === date); if (i >= 0) a.lots[i] = { date, cost, note }; else a.lots.push({ date, cost, note }); }
     this._buy = null;
-    this.save();
-    if (FirebaseSync.isLoggedIn()) FirebaseSync.saveToCloud();
-    this.render();
-    this.close('modal-buy');
-    document.getElementById('buy-amount').value = '';
-    document.getElementById('buy-note').value = '';
+    this.save(); if (FirebaseSync.isLoggedIn()) FirebaseSync.saveToCloud();
+    this.render(); this.close('modal-buy');
+    document.getElementById('buy-amount').value = ''; document.getElementById('buy-note').value = '';
   },
   openValueModal(assetId) {
     this._valueAsset = assetId;
@@ -700,20 +501,105 @@ const App = {
     const v = +document.getElementById('value-input').value;
     if (!(v >= 0)) return;
     a.current = v;
+    const today = new Date().toISOString().split('T')[0];
+    const existing = a.history.find(p => p.date === today);
+    if (existing) existing.value = v; else a.history.push({ date: today, value: v });
+    a.history = a.history.slice(-30);
     this._valueAsset = null;
-    this.save();
-    if (FirebaseSync.isLoggedIn()) FirebaseSync.saveToCloud();
-    this.render();
-    this.close('modal-value');
+    this.save(); if (FirebaseSync.isLoggedIn()) FirebaseSync.saveToCloud();
+    this.render(); this.close('modal-value');
     document.getElementById('value-input').value = '';
+  },
+
+  _debt: null,
+  openDebtModal(id) {
+    this._debt = id;
+    const d = this.debts.find(x => x.id === id);
+    document.getElementById('debt-name').value = d.name;
+    document.getElementById('debt-pending').value = d.pending;
+    document.getElementById('debt-monthly').value = d.monthly;
+    this.open('modal-debt');
+  },
+  saveDebt() {
+    const d = this.debts.find(x => x.id === this._debt);
+    if (!d) return;
+    const p = +document.getElementById('debt-pending').value;
+    const m = +document.getElementById('debt-monthly').value;
+    if (!(p >= 0)) return;
+    d.pending = p; d.monthly = m >= 0 ? m : d.monthly;
+    this._debt = null;
+    this.save(); if (FirebaseSync.isLoggedIn()) FirebaseSync.saveToCloud();
+    this.render(); this.close('modal-debt');
+  },
+
+  saveHouseParams() {
+    this.houseParams.entryPct = +document.getElementById('set-entry-pct').value || 0;
+    this.houseParams.taxesPct = +document.getElementById('set-taxes-pct').value || 0;
+    this.houseParams.houseInc = +document.getElementById('set-house-inc').value || 0;
+    this.save(); if (FirebaseSync.isLoggedIn()) FirebaseSync.saveToCloud();
+    this.render();
+  },
+
+  // ---- Events ----
+  bindEvents() {
+    document.getElementById('btn-login').addEventListener('click', () => this.open('modal-login'));
+    document.getElementById('login-close').addEventListener('click', () => this.close('modal-login'));
+    document.getElementById('modal-login').addEventListener('click', e => { if (e.target.id === 'modal-login') this.close('modal-login'); });
+    document.getElementById('btn-google-login').addEventListener('click', async () => { try { await FirebaseSync.signInGoogle(); this.close('modal-login'); } catch (e) { alert('Error: ' + e.message); } });
+    document.getElementById('form-email-login').addEventListener('submit', async (e) => { e.preventDefault(); try { await FirebaseSync.signInEmail(document.getElementById('login-email').value, document.getElementById('login-password').value); this.close('modal-login'); } catch (err) { alert('Error: ' + err.message); } });
+    document.getElementById('btn-logout').addEventListener('click', async () => { if (confirm('¿Cerrar sesión?')) await FirebaseSync.signOut(); });
+
+    // Nav
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+        document.getElementById('tab-' + btn.dataset.tab).classList.remove('hidden');
+        if (btn.dataset.tab === 'cartera') this.portfolio.forEach(a => this.renderAssetChart(a));
+      });
+    });
+
+    // House params live save
+    ['set-entry-pct', 'set-taxes-pct', 'set-house-inc'].forEach(id => {
+      document.getElementById(id).addEventListener('change', () => this.saveHouseParams());
+    });
+
+    // Saving modal
+    document.getElementById('btn-add-saving').addEventListener('click', () => this.openEntryModal('saving'));
+    document.getElementById('saving-close').addEventListener('click', () => this.close('modal-saving'));
+    document.getElementById('btn-do-save').addEventListener('click', () => this.saveEntry('saving'));
+
+    // House modal
+    document.getElementById('btn-add-house').addEventListener('click', () => this.openEntryModal('house'));
+    document.getElementById('house-close').addEventListener('click', () => this.close('modal-house'));
+    document.getElementById('btn-do-house').addEventListener('click', () => this.saveEntry('house'));
+
+    // Buy modal
+    document.getElementById('buy-close').addEventListener('click', () => this.close('modal-buy'));
+    document.getElementById('btn-do-buy').addEventListener('click', () => this.saveBuy());
+
+    // Value modal
+    document.getElementById('value-close').addEventListener('click', () => this.close('modal-value'));
+    document.getElementById('btn-do-value').addEventListener('click', () => this.saveValue());
+
+    // Debt modal
+    document.getElementById('debt-close').addEventListener('click', () => this.close('modal-debt'));
+    document.getElementById('btn-do-debt').addEventListener('click', () => this.saveDebt());
+
+    // Backdrop
+    ['modal-login', 'modal-saving', 'modal-house', 'modal-buy', 'modal-value', 'modal-debt'].forEach(id => {
+      document.getElementById(id).addEventListener('click', e => { if (e.target === document.getElementById(id)) this.close(id); });
+    });
   },
 
   open(id) { document.getElementById(id).classList.remove('hidden'); },
   close(id) { document.getElementById(id).classList.add('hidden'); },
   n(v) { return Math.round(v).toLocaleString('es-ES'); },
+  money(v) { return (v ?? 0).toLocaleString('es-ES', { maximumFractionDigits: 2 }); },
   fmtDate(d) {
     const [y, m] = d.split('-');
-    const months = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
     return `${months[+m - 1]} ${y}`;
   }
 };

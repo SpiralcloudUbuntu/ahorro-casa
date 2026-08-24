@@ -52,10 +52,11 @@ const FirebaseSync = {
     if (!doc) return;
     try {
       await doc.set({
-        settings: App.settings,
+        houseParams: App.houseParams,
         savings: App.savings,
         housePrices: App.housePrices,
         portfolio: App.portfolio,
+        debts: App.debts,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
     } catch (e) { console.error('Save error:', e); }
@@ -68,10 +69,11 @@ const FirebaseSync = {
       const snap = await doc.get();
       if (snap.exists) {
         const data = snap.data();
-        if (data.settings) Object.assign(App.settings, data.settings);
+        if (data.houseParams) Object.assign(App.houseParams, data.houseParams);
         if (data.savings && data.savings.length > 0) App.savings = data.savings;
         if (data.housePrices && data.housePrices.length > 0) App.housePrices = data.housePrices;
-        if (Array.isArray(data.portfolio)) App.portfolio = data.portfolio;
+        if (Array.isArray(data.portfolio) && data.portfolio.length > 0) App.portfolio = data.portfolio;
+        if (Array.isArray(data.debts)) App.debts = data.debts;
         App.save();
         App.render();
       } else {

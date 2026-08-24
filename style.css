@@ -78,19 +78,16 @@ header h1 { font-size: 20px; font-weight: 700; }
 
 /* Bottom nav */
 .bottom-nav {
-  position: fixed !important;
-  bottom: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  width: 100% !important;
-  margin: 0 !important;
-  transform: none !important;
-  background: #0a0a1a;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(10,10,26,0.95);
+  backdrop-filter: blur(10px);
   border-top: 1px solid var(--card-border);
   display: flex;
-  z-index: 999999 !important;
+  z-index: 200;
   padding-bottom: env(safe-area-inset-bottom);
-  max-height: none !important;
 }
 .nav-btn {
   flex: 1;
@@ -256,6 +253,17 @@ header h1 { font-size: 20px; font-weight: 700; }
 .data-note { font-size: 11px; color: var(--text-dim); }
 .data-right { text-align: right; }
 .data-delete { background: none; border: none; color: var(--red); font-size: 14px; cursor: pointer; padding: 4px 8px; margin-left: 8px; }
+
+/* House params (inputs en Ahorro) */
+.house-params { display: flex; gap: 10px; margin-bottom: 12px; }
+.param { flex: 1; }
+.param label { display: block; font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }
+.param input {
+  width: 100%; padding: 9px 10px;
+  background: rgba(255,255,255,0.06); border: 1px solid var(--card-border);
+  border-radius: 10px; color: var(--text); font-size: 14px;
+}
+.param input:focus { outline: none; border-color: var(--accent); }
 
 /* Modal */
 .modal {

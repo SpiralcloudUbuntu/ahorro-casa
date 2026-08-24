@@ -12,25 +12,18 @@
 </head>
 <body>
   <div class="app">
-    <!-- Header -->
+    <!-- ===== Header ===== -->
     <header>
       <h1>🏠 Ahorro Casa</h1>
       <div class="header-right">
         <div id="user-info" class="user-info hidden"><span id="user-name" class="user-name"></span></div>
         <button id="btn-login" class="btn-icon-sm" title="Entrar">👤</button>
         <button id="btn-logout" class="btn-icon-sm hidden" title="Salir">🚪</button>
-        <button id="btn-settings" class="btn-icon" title="Configuración">⚙️</button>
       </div>
     </header>
 
-    <!-- Tab: Situación -->
+    <!-- ===== Tab: Situación ===== -->
     <section id="tab-situacion" class="tab-content">
-      <!-- Scenario toggle -->
-      <div class="scenario-toggle">
-        <button class="scenario-btn active" data-scenario="solo">👤 Solo Guti</button>
-        <button class="scenario-btn" data-scenario="both">👥 Con Carolina</button>
-      </div>
-
       <!-- Progress ring -->
       <div class="hero">
         <div class="progress-ring-container">
@@ -63,19 +56,19 @@
       <!-- Stats -->
       <div class="stats-grid">
         <div class="stat-card">
-          <div class="stat-icon">💰</div>
-          <div class="stat-label">Ahorro mensual</div>
-          <div class="stat-value" id="stat-monthly">—</div>
+          <div class="stat-icon">💶</div>
+          <div class="stat-label">Ahorro efectivo</div>
+          <div class="stat-value" id="stat-cash">—</div>
         </div>
         <div class="stat-card">
           <div class="stat-icon">📈</div>
-          <div class="stat-label">Casa hoy</div>
-          <div class="stat-value" id="stat-house-now">—</div>
+          <div class="stat-label">Cartera ETF</div>
+          <div class="stat-value" id="stat-portfolio">—</div>
         </div>
         <div class="stat-card">
           <div class="stat-icon">🏠</div>
-          <div class="stat-label">Casa entonces</div>
-          <div class="stat-value" id="stat-house-then">—</div>
+          <div class="stat-label">Casa hoy</div>
+          <div class="stat-value" id="stat-house-now">—</div>
         </div>
         <div class="stat-card">
           <div class="stat-icon">🎯</div>
@@ -87,30 +80,20 @@
       <!-- Patrimonio -->
       <div class="breakdown-card">
         <h3>Tu patrimonio</h3>
-        <div class="breakdown-list">
-          <div class="breakdown-item"><span class="breakdown-dot" style="background:#3498db"></span><span class="breakdown-label">S&P 500</span><span class="breakdown-value" id="bd-spy">—</span></div>
-          <div class="breakdown-item"><span class="breakdown-dot" style="background:#2ecc71"></span><span class="breakdown-label">MSCI World</span><span class="breakdown-value" id="bd-msci">—</span></div>
-          <div class="breakdown-item"><span class="breakdown-dot" style="background:#f39c12"></span><span class="breakdown-label">Oro</span><span class="breakdown-value" id="bd-gold">—</span></div>
-          <div class="breakdown-item"><span class="breakdown-dot" style="background:#9b59b6"></span><span class="breakdown-label">Efectivo TR</span><span class="breakdown-value" id="bd-cash">—</span></div>
-          <div class="breakdown-item total"><span class="breakdown-dot" style="background:transparent"></span><span class="breakdown-label">Total activos</span><span class="breakdown-value" id="bd-total">—</span></div>
-        </div>
+        <div id="bd-assets" class="breakdown-list"></div>
       </div>
 
-      <!-- Préstamos + Patrimonio neto -->
+      <!-- Préstamos -->
       <div class="breakdown-card">
         <h3>Préstamos</h3>
-        <div class="breakdown-list">
-          <div class="breakdown-item"><span class="breakdown-dot" style="background:#e74c3c"></span><span class="breakdown-label">*8602</span><span class="breakdown-value" id="bd-loan1">—</span></div>
-          <div class="breakdown-item"><span class="breakdown-dot" style="background:#e74c3c"></span><span class="breakdown-label">*7491</span><span class="breakdown-value" id="bd-loan2">—</span></div>
-          <div class="breakdown-item"><span class="breakdown-dot" style="background:#e74c3c"></span><span class="breakdown-label">Cuota mensual</span><span class="breakdown-value" id="bd-loan-m">—</span></div>
-          <div class="breakdown-item total"><span class="breakdown-dot" style="background:transparent"></span><span class="breakdown-label">Patrimonio neto</span><span class="breakdown-value" id="bd-net-worth">—</span></div>
-        </div>
+        <div id="bd-debts" class="breakdown-list"></div>
+        <div class="breakdown-item total"><span class="breakdown-dot" style="background:transparent"></span><span class="breakdown-label">Patrimonio neto</span><span class="breakdown-value" id="bd-net-worth">—</span></div>
       </div>
     </section>
 
-    <!-- Tab: Calculadora -->
-    <section id="tab-calculadora" class="tab-content hidden">
-      <!-- Estimación basada en datos reales -->
+    <!-- ===== Tab: Ahorro ===== -->
+    <section id="tab-ahorro" class="tab-content hidden">
+      <!-- Estimación -->
       <div class="calc-estimate" id="calc-estimate">
         <div class="calc-estimate-title">📊 Basado en tus datos reales</div>
         <div class="calc-estimate-grid">
@@ -133,33 +116,35 @@
         </div>
       </div>
 
-      <!-- Entradas de ahorro -->
+      <!-- Vivienda (parámetros, antiguos ajustes) -->
       <div class="calc-section">
         <div class="calc-header">
-          <h3>💰 Entradas de ahorro</h3>
-          <button id="btn-add-saving" class="btn-small">+ Añadir</button>
+          <h3>🏠 Vivienda</h3>
+          <button id="btn-add-house" class="btn-small">+ Precio</button>
         </div>
-        <div id="savings-list" class="data-list">
-          <p class="data-empty">Sin datos. Pulsa "+ Añadir" cada vez que quieras registrar.</p>
+        <div class="house-params">
+          <div class="param"><label>Entrada %</label><input type="number" id="set-entry-pct" value="10"></div>
+          <div class="param"><label>Impuestos %</label><input type="number" id="set-taxes-pct" value="10"></div>
+          <div class="param"><label>Subida/año %</label><input type="number" id="set-house-inc" value="5" step="0.5"></div>
         </div>
-        <div class="chart-container">
-          <canvas id="chart-canvas"></canvas>
+        <div id="house-list" class="data-list">
+          <p class="data-empty">Sin datos. Pulsa "+ Precio" para registrar el precio.</p>
         </div>
       </div>
 
-      <!-- Entradas de vivienda -->
+      <!-- Entradas de ahorro -->
       <div class="calc-section">
         <div class="calc-header">
-          <h3>🏠 Precio vivienda</h3>
-          <button id="btn-add-house" class="btn-small">+ Añadir</button>
+          <h3>💶 Entradas de ahorro</h3>
+          <button id="btn-add-saving" class="btn-small">+ Añadir</button>
         </div>
-        <div id="house-list" class="data-list">
-          <p class="data-empty">Sin datos. Pulsa "+ Añadir" cuando busques o actualices precio.</p>
+        <div id="savings-list" class="data-list">
+          <p class="data-empty">Sin datos. Pulsa "+ Añadir" cada vez que quieras registrar lo ahorrado (fuera de ETFs).</p>
         </div>
       </div>
     </section>
 
-    <!-- Tab: Cartera -->
+    <!-- ===== Tab: Cartera ===== -->
     <section id="tab-cartera" class="tab-content hidden">
       <div class="stats-grid">
         <div class="stat-card">
@@ -172,11 +157,9 @@
           <div class="stat-label">Valor actual</div>
           <div class="stat-value" id="pf-value">—</div>
         </div>
-      </div>
-      <div class="stats-grid">
         <div class="stat-card">
           <div class="stat-icon">📊</div>
-          <div class="stat-label">Pérdidas / ganancias</div>
+          <div class="stat-label">P/L</div>
           <div class="stat-value" id="pf-pnl">—</div>
         </div>
         <div class="stat-card">
@@ -188,23 +171,44 @@
       <div id="portfolio-list"></div>
     </section>
 
-    <!-- Bottom nav -->
+    <!-- ===== Tab: Deudas ===== -->
+    <section id="tab-deudas" class="tab-content hidden">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">🏦</div>
+          <div class="stat-label">Deuda total</div>
+          <div class="stat-value" id="dq-total">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">💸</div>
+          <div class="stat-label">Cuota mensual</div>
+          <div class="stat-value" id="dq-monthly">—</div>
+        </div>
+      </div>
+      <div id="debt-list"></div>
+    </section>
+
+    <!-- ===== Bottom nav ===== -->
     <nav class="bottom-nav">
       <button class="nav-btn active" data-tab="situacion">
         <span class="nav-icon">📊</span>
         <span class="nav-label">Situación</span>
       </button>
-      <button class="nav-btn" data-tab="calculadora">
-        <span class="nav-icon">🧮</span>
-        <span class="nav-label">Calculadora</span>
+      <button class="nav-btn" data-tab="ahorro">
+        <span class="nav-icon">💶</span>
+        <span class="nav-label">Ahorro</span>
       </button>
       <button class="nav-btn" data-tab="cartera">
         <span class="nav-icon">📈</span>
         <span class="nav-label">Cartera</span>
       </button>
+      <button class="nav-btn" data-tab="deudas">
+        <span class="nav-icon">🏦</span>
+        <span class="nav-label">Deudas</span>
+      </button>
     </nav>
 
-    <!-- Modal: Login -->
+    <!-- ===== Modal: Login ===== -->
     <div id="modal-login" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
@@ -226,50 +230,7 @@
       </div>
     </div>
 
-    <!-- Modal: Settings -->
-    <div id="modal-settings" class="modal hidden">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2>⚙️ Configuración</h2>
-          <button class="btn-close" id="settings-close">✕</button>
-        </div>
-        <div class="form-section">
-          <h3>🏠 Vivienda</h3>
-          <div class="form-group"><label>Precio actual (€)</label><input type="number" id="set-house-price" value="400000"></div>
-          <div class="form-group"><label>Entrada (%)</label><input type="number" id="set-entry-pct" value="10"></div>
-          <div class="form-group"><label>Impuestos (%)</label><input type="number" id="set-taxes-pct" value="10"></div>
-          <div class="form-group"><label>Subida anual (%)</label><input type="number" id="set-house-inc" value="5" step="0.5"></div>
-        </div>
-        <div class="form-section">
-          <h3>👤 Guti</h3>
-          <div class="form-group"><label>Ahorro mensual (€)</label><input type="number" id="set-solo-m" value="450"></div>
-        </div>
-        <div class="form-section">
-          <h3>👥 Con Carolina</h3>
-          <div class="form-group"><label>Ahorro mensual (€)</label><input type="number" id="set-both-m" value="1500"></div>
-        </div>
-        <div class="form-section">
-          <h3>💰 Patrimonio</h3>
-          <div class="form-group"><label>S&P 500 (€)</label><input type="number" id="set-spy" value="316"></div>
-          <div class="form-group"><label>MSCI World (€)</label><input type="number" id="set-msci" value="58"></div>
-          <div class="form-group"><label>Oro (€)</label><input type="number" id="set-gold" value="51"></div>
-          <div class="form-group"><label>Efectivo TR (€)</label><input type="number" id="set-cash" value="1410"></div>
-          <div class="form-group"><label>S&P 500 mensual (€)</label><input type="number" id="set-spy-m" value="50"></div>
-        </div>
-        <div class="form-section">
-          <h3>📉 Préstamos</h3>
-          <div class="form-group"><label>Pendiente *8602 (€)</label><input type="number" id="set-l1" value="5544"></div>
-          <div class="form-group"><label>Pendiente *7491 (€)</label><input type="number" id="set-l2" value="15924"></div>
-          <div class="form-group"><label>Cuota mensual (€)</label><input type="number" id="set-lm" value="279"></div>
-        </div>
-        <div class="form-actions">
-          <button id="btn-save-settings" class="btn-primary">💾 Guardar</button>
-          <button id="btn-reset" class="btn-secondary">🔄 Reset</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Modal: Add saving -->
+    <!-- ===== Modal: Add saving ===== -->
     <div id="modal-saving" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
@@ -277,13 +238,13 @@
           <button class="btn-close" id="saving-close">✕</button>
         </div>
         <div class="form-group"><label>Fecha</label><input type="date" id="save-date"></div>
-        <div class="form-group"><label>Total ahorrado (€)</label><input type="number" id="save-amount" placeholder="Ej: 1500"></div>
+        <div class="form-group"><label>Total ahorrado en efectivo (€)</label><input type="number" id="save-amount" placeholder="Ej: 1500"></div>
         <div class="form-group"><label>Nota (opcional)</label><input type="text" id="save-note" placeholder="Ej: nómina agosto"></div>
         <div class="form-actions"><button id="btn-do-save" class="btn-primary">💾 Guardar</button></div>
       </div>
     </div>
 
-    <!-- Modal: Add house price -->
+    <!-- ===== Modal: Add house price ===== -->
     <div id="modal-house" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
@@ -297,7 +258,7 @@
       </div>
     </div>
 
-    <!-- Modal: Add purchase -->
+    <!-- ===== Modal: Add purchase ===== -->
     <div id="modal-buy" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
@@ -312,7 +273,7 @@
       </div>
     </div>
 
-    <!-- Modal: Update current value -->
+    <!-- ===== Modal: Update current value ===== -->
     <div id="modal-value" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
@@ -322,6 +283,20 @@
         <div class="form-group"><label>Activo</label><input type="text" id="value-asset" disabled></div>
         <div class="form-group"><label>Valor actual en Trade Republic (€)</label><input type="number" id="value-input" placeholder="Ej: 380" step="0.01"></div>
         <div class="form-actions"><button id="btn-do-value" class="btn-primary">💾 Guardar</button></div>
+      </div>
+    </div>
+
+    <!-- ===== Modal: Edit debt ===== -->
+    <div id="modal-debt" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="debt-title">🏦 Actualizar préstamo</h2>
+          <button class="btn-close" id="debt-close">✕</button>
+        </div>
+        <div class="form-group"><label>Préstamo</label><input type="text" id="debt-name" disabled></div>
+        <div class="form-group"><label>Pendiente actual (€)</label><input type="number" id="debt-pending" placeholder="Ej: 5200" step="0.01"></div>
+        <div class="form-group"><label>Cuota mensual (€)</label><input type="number" id="debt-monthly" placeholder="Ej: 69" step="0.01"></div>
+        <div class="form-actions"><button id="btn-do-debt" class="btn-primary">💾 Guardar</button></div>
       </div>
     </div>
   </div>
