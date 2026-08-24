@@ -55,6 +55,7 @@ const FirebaseSync = {
         settings: App.settings,
         savings: App.savings,
         housePrices: App.housePrices,
+        portfolio: App.portfolio,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge: true });
     } catch (e) { console.error('Save error:', e); }
@@ -70,6 +71,7 @@ const FirebaseSync = {
         if (data.settings) Object.assign(App.settings, data.settings);
         if (data.savings && data.savings.length > 0) App.savings = data.savings;
         if (data.housePrices && data.housePrices.length > 0) App.housePrices = data.housePrices;
+        if (Array.isArray(data.portfolio)) App.portfolio = data.portfolio;
         App.save();
         App.render();
       } else {
